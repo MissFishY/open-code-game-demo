@@ -18,22 +18,24 @@
           <p id="objective-progress" class="panel__muted"></p>
         </section>
 
-        <section id="stats-panel" class="panel panel--stats">
-          <div class="stat"><span class="stat__label">木材</span><span id="stat-wood" class="stat__value">0</span></div>
-          <div class="stat"><span class="stat__label">芦苇</span><span id="stat-fiber" class="stat__value">0</span></div>
-          <div class="stat"><span class="stat__label">水晶</span><span id="stat-crystal" class="stat__value">0</span></div>
-          <div class="stat"><span class="stat__label">携带</span><span id="stat-total" class="stat__value">0</span></div>
-          <div class="stat"><span class="stat__label">温馨度</span><span id="stat-cozy" class="stat__value">0</span></div>
-          <div class="stat"><span class="stat__label">钱币</span><span id="stat-coins" class="stat__value">0</span></div>
-          <div class="stat"><span class="stat__label">时间</span><span id="stat-time" class="stat__value">第 1 天</span></div>
-          <div class="stat"><span class="stat__label">天气</span><span id="stat-weather" class="stat__value">晴</span></div>
-          <div class="stat"><span class="stat__label">&#24037;&#20855;</span><span id="stat-tools" class="stat__value">&#8212;</span></div>
-        </section>
+        <div class="hud-right">
+          <section id="stats-panel" class="panel panel--stats">
+            <div class="stat"><span class="stat__label">木材</span><span id="stat-wood" class="stat__value">0</span></div>
+            <div class="stat"><span class="stat__label">芦苇</span><span id="stat-fiber" class="stat__value">0</span></div>
+            <div class="stat"><span class="stat__label">水晶</span><span id="stat-crystal" class="stat__value">0</span></div>
+            <div class="stat"><span class="stat__label">携带</span><span id="stat-total" class="stat__value">0</span></div>
+            <div class="stat"><span class="stat__label">温馨度</span><span id="stat-cozy" class="stat__value">0</span></div>
+            <div class="stat"><span class="stat__label">钱币</span><span id="stat-coins" class="stat__value">0</span></div>
+            <div class="stat"><span class="stat__label">时间</span><span id="stat-time" class="stat__value">第 1 天</span></div>
+            <div class="stat"><span class="stat__label">天气</span><span id="stat-weather" class="stat__value">晴</span></div>
+            <div class="stat"><span class="stat__label">工具</span><span id="stat-tools" class="stat__value">—</span></div>
+          </section>
 
-        <div id="hud-buttons" class="hud-buttons">
-          <button type="button" class="hud-button" data-panel="saves">💾 存档</button>
-          <button type="button" class="hud-button" data-panel="inventory">🎒 背包</button>
-          <button type="button" class="hud-button" data-panel="journal">📖 日志</button>
+          <div id="hud-buttons" class="hud-buttons">
+            <button type="button" class="hud-button" data-panel="saves">存档<kbd>K</kbd></button>
+            <button type="button" class="hud-button" data-panel="inventory">背包<kbd>Tab</kbd></button>
+            <button type="button" class="hud-button" data-panel="journal">日志<kbd>J</kbd></button>
+          </div>
         </div>
 
         <section id="stamina-panel" class="stamina">
@@ -58,10 +60,13 @@
             <li><b>Shift</b> 冲刺</li>
             <li><b>空格</b> 跳跃</li>
             <li><b>E</b> 交互 / 对话</li>
+            <li><b>左键</b> 点击目标直接互动</li>
             <li><b>Tab</b> 背包</li>
+            <li><b>K</b> 存档</li>
             <li><b>J</b> 日志</li>
             <li><b>Esc</b> 关闭面板 / 释放鼠标</li>
           </ul>
+          <p class="panel--help__note">右上角也有「存档 / 背包 / 日志」三个按钮，鼠标自由时可以直接点。</p>
         </section>
 
         <!-- 对话 ---------------------------------------------------------->

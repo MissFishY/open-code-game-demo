@@ -93,14 +93,27 @@ body {
   line-height: 1.4;
 }
 
-.panel--stats {
+/* The stats panel and the quick buttons share one right-hand column so
+   * they can never sit on top of each other. */
+.hud-right {
+  position: absolute;
   top: 16px;
   right: 16px;
-  min-width: 160px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  /* Clicks fall through to the canvas; only the buttons react. */
+  pointer-events: none;
+}
+
+.panel--stats {
+  position: static;
+  min-width: 208px;
   display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 4px 12px;
-  font-size: 13px;
+  grid-template-columns: auto auto auto auto;
+  gap: 5px 12px;
+  font-size: 12.5px;
 }
 
 .stat {
@@ -135,6 +148,14 @@ body {
 
 .panel--help b {
   color: var(--text);
+}
+
+.panel--help__note {
+  margin: 8px 0 0;
+  max-width: 320px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--muted);
 }
 
 /* ---------- Interaction prompt ---------- */
@@ -758,32 +779,52 @@ body {
 /* ---------- HUD buttons ---------- */
 
 .hud-buttons {
-  position: absolute;
-  top: 16px;
-  right: 16px;
+  position: static;
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 6px;
-  transform: translateY(-100%);
-  margin-top: -8px;
+  pointer-events: auto;
 }
 
 .hud-button {
-  padding: 6px 11px;
-  border-radius: 9px;
-  border: 1px solid var(--panel-border);
-  background: var(--panel);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: rgba(16, 26, 36, 0.94);
   color: var(--text);
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
-  box-shadow: var(--shadow);
-  transition: background 120ms ease, transform 120ms ease;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
 }
 
 .hud-button:hover {
-  background: rgba(255, 209, 102, 0.18);
+  background: rgba(255, 209, 102, 0.22);
   border-color: var(--accent);
   transform: translateY(-1px);
+}
+
+.hud-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.hud-button kbd {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: var(--accent);
 }
 
 /* ---------- Stamina bar ---------- */
@@ -874,5 +915,13 @@ body {
   .panel--objective {
     min-width: 0;
     max-width: 60vw;
+  }
+  .panel--stats {
+    min-width: 0;
+    font-size: 11.5px;
+  }
+  .hud-button {
+    padding: 6px 9px;
+    font-size: 12px;
   }
 }
