@@ -55,12 +55,14 @@ describe('tools', () => {
     const market = new MarketSystem(0);
     // Without a tool.
     expect(market.toolBonus('axe')).toBe(0);
-    // With one.
+    // With one: clearly better than bare hands.
     market.upgradeTool('axe', 1);
-    expect(market.toolBonus('axe')).toBe(1);
+    expect(market.toolBonus('axe')).toBe(TOOL_LEVELS.axe[0]?.bonus);
+    expect(market.toolBonus('axe')).toBeGreaterThanOrEqual(2);
     // And upgraded.
     market.upgradeTool('axe', 3);
     expect(market.toolBonus('axe')).toBe(TOOL_LEVELS.axe[2]?.bonus);
+    expect(market.toolBonus('axe')).toBeGreaterThan(TOOL_LEVELS.axe[0]?.bonus ?? 0);
   });
 
   it('are described honestly in the item list', () => {

@@ -15,6 +15,8 @@ let html = readFileSync(file, 'utf8');
 const before = html;
 html = html.replace('<script type="module" crossorigin>', '<script type="module">');
 html = html.replace(/<link rel="modulepreload"[^>]*>/g, '');
+// The inlined stylesheet keeps a stray `crossorigin` attribute as well.
+html = html.replace('<style rel="stylesheet" crossorigin>', '<style rel="stylesheet">');
 
 if (html === before) {
   console.warn('[single-file] nothing to rewrite — the script tag may have changed shape');

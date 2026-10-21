@@ -34,8 +34,10 @@ npm run dev        # http://localhost:5173
 | `Shift`        | Sprint (costs stamina)                    |
 | `Space`        | Jump                                      |
 | `E` / `Enter`  | Interact — talk, chop, mine, fish, dive, build, decorate |
+| **Left click**  | Interact with whatever you point at (or grab the mouse on empty space) |
 | `Tab` / `I`    | Open / close the backpack                 |
 | `J`            | Open the journal (quests and friendships)  |
+| `K`            | Open the save slots                       |
 | `1` `2` `3`    | Pick a dialogue option                     |
 | `F1`           | Toggle the controls panel                  |
 | `Esc`          | Close a panel / release the mouse          |
@@ -87,6 +89,23 @@ night over, resets the villagers' greetings and saves the game.
 So you can sprint for roughly three seconds before you need to catch your
 breath, and a swim across the lake is a real decision rather than a free ride.
 
+## The mouse
+
+You never have to fight the cursor:
+
+- **Every panel has a ✕** in the corner, so the mouse is always enough to get
+  out of one.
+- **Left click interacts.** Point at a tree, a villager, a fishing spot or the
+  build site and click it — the game picks whatever is closest along the line
+  of sight.
+- **Clicking empty space grabs the mouse** for camera control.
+- **Esc only releases the mouse** the first time; the panel stays open so you
+  can still click things inside it. A second Esc closes the panel.
+- When the mouse is free, a hint in the middle of the screen tells you to
+  click the world to get the camera back.
+- Three buttons in the corner (存档 / 背包 / 日志) open the panels directly,
+  and they work as soon as the mouse is free.
+
 ## The villagers
 
 Each one has a trade and a trouble of their own.
@@ -120,8 +139,8 @@ second workbench once it is raised.
 | ----------- | ---------------------- | -------- | ---------------------------------------- |
 | **Plank**   | 2 wood                 | 1 plank  | Basic building block                     |
 | **Rope**    | 3 fiber                | 1 rope   | Lashes the hut together                  |
-| **Stone Axe** 🪓 | 2 stone + 1 fiber | 1 axe | Chop 2 wood per tree |
-| **Stone Pickaxe** ⛏️ | 2 stone + 1 plank | 1 pickaxe | Mine 2 stone per swing |
+| **Stone Axe** 🪓 | 2 stone + 1 fiber | 1 axe | Chop 3 wood per tree (bare hands: 1) |
+| **Stone Pickaxe** ⛏️ | 2 stone + 1 plank | 1 pickaxe | Mine 3 stone per swing (bare hands: 1) |
 | **Campfire** 🔥 | 3 wood + 2 fiber | 1 campfire | Place it in the fire pit. +3 coziness |
 | **Lantern** 🏮 | 1 wood + 1 rope | 1 lantern | Place it by the door. +2 coziness |
 | **Banner** 🚩 | 2 fiber + 1 flower | 1 banner | Place it on the roof. +2 coziness |
@@ -138,9 +157,13 @@ worth its materials:
 | 徒手 | —— | 1 木材 · 2 石块 |
 | **石斧** | **自己合成**：2 石块 + 1 绳索 | 2 木材 · 4 石块 |
 | **石镐** | **自己合成**：2 石块 + 1 木板 | 2 木材 · 4 石块 |
-| **磨石斧 / 护林员之斧** | Tallis 处 20 / 48 币 + 材料 | 3 / 4 木材 |
-| **重石镐 / 矿工之镐** | Tallis 处 20 / 48 币 + 材料 | 3 / 4 石块 |
+| **磨石斧 / 护林员之斧** | Tallis 处 20 / 48 币 + 材料 | 6 / 10 木材 |
+| **重石镐 / 矿工之镐** | Tallis 处 20 / 48 币 + 材料 | 6 / 10 石块 |
 | **韧鱼竿 / 月见鱼竿** | Tallis 处 30 / 65 币 + 材料 | 绿区更宽 |
+
+**工具有耐久，会磨损。** 一级斧头只能用 30 次，砍完就断，回到徒手。
+断之前可以卖给 Tallis 换回一点钱（一级 4 币，二级 14 币，三级 36 币），
+或者留着继续用。耐久会存在存档里。
 
 **Tallis 只会借你一根鱼竿**（免费，钓鱼是岛上的经济，得一开始就够得着）。
 斧头和镐子得你自己打 —— 所以开局的目标很明确：
@@ -232,7 +255,7 @@ stamina, so do not stay under too long.
 You start with **30 coins** (the little purse you arrived with) and Tallis
 lends you his tools for free, so you can start fishing on day one. Then:
 
-> **钓�� → 卖给村民 → 拿钱 → 买游泳衣 / 衣服 / 家具 / 扩建**
+> **钓鱼 → 卖给村民 → 拿钱 → 买游泳衣 / 衣服 / 家具 / 扩建**
 
 Each villager buys fish at a different rate and is after one species in
 particular — the fish they want pays **double**, and the shop marks it with
@@ -324,10 +347,13 @@ npm run preview -- --host
 
 ### 存档说明
 
-进度存在浏览器的 `localStorage` 里（键名 `lowpoly-island.save.v1`）。
-每个浏览器各存各的，换浏览器或清缓存会丢档。
+游戏有 **三个手动存档位**，按 `K` 或点右上角的 💾 打开。
+每一格可以「设为当前」「读取」「保存」「删除」。
+自动存档（每 10 秒、切换标签页、关闭页面时）会写进「当前」这一格。
+
+进度存在浏览器的 `localStorage` 里。每个浏览器各存各的，换浏览器或清缓存会丢档。
 如果浏览器禁用了本地存储（某些隐私模式），游戏会自动退回到内存存档 —— 能玩，但关掉就没了。
-游戏内按 `Delete` 两次可以手动清档。
+游戏内按 `Delete` 两次可以手动清掉当前存档位。
 
 ---
 

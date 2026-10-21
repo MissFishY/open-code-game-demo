@@ -17,7 +17,7 @@ import { FishingSystem } from './FishingSystem';
 import { InteriorSystem } from './InteriorSystem';
 import { MarketSystem } from './MarketSystem';
 import { StaminaSystem, STAMINA } from './StaminaSystem';
-import { TimeSystem } from './TimeSystem';
+import { TimeSystem, PHASE_LABELS, WEATHER_LABELS, type DayPhase, type Weather } from './TimeSystem';
 import { TrustSystem, type NpcId } from './TrustSystem';
 import { WardrobeSystem } from './WardrobeSystem';
 import {
@@ -830,8 +830,14 @@ export class Game {
 
   /** Opens the save-slot panel. */
   private openSaves(): void {
+    const slots = this.saveSystem.listSlots().map((slot) => ({
+      ...slot,
+      phase: slot.phase ? PHASE_LABELS[slot.phase as DayPhase] ?? slot.phase : undefined,
+      weather: slot.weather ? WEATHER_LABELS[slot.weather as Weather] ?? slot.weather : undefined,
+    }));
+
     this.ui.showSaves({
-      slots: this.saveSystem.listSlots(),
+      slots,
       currentSlot: this.saveSystem.currentSlot,
       onSelect: (slot) => {
         this.saveSystem.currentSlot = slot;

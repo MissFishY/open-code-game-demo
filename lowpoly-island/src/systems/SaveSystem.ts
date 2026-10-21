@@ -391,7 +391,7 @@ export class SaveSystem {
       if (!slot.exists) continue;
       const data = this.loadFrom(slot.slot);
       if (!data) continue;
-      if (!best || data.savedAt > best.savedAt) best = data;
+      if (!best || data.savedAt >= best.savedAt) best = data;
     }
     return best;
   }
