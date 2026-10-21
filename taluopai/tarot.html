@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>塔罗三牌阵 · 过去 · 现在 · 未来</title>
+<style>
+  :root{
+    --bg-0:#07050f;
+    --bg-1:#130e29;
+    --gold:#d9b975;
+    --gold-bright:#f2dcae;
+    --gold-dim:rgba(217,185,117,.42);
+    --ink:#f0e8d8;
+    --muted:#9d92b4;
+    --line:rgba(217,185,117,.18);
+    --panel:rgba(255,255,255,.035);
+    --serif:"Songti SC","Noto Serif SC","Source Han Serif SC",Georgia,"Times New Roman","STSong",serif;
+    --sans:"PingFang SC","Microsoft YaHei","Hiragino Sans GB",system-ui,-apple-system,"Segoe UI",sans-serif;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{min-height:100%}
+  html{scrollbar-gutter:stable}
+  body{
+    margin:0;
+    padding:clamp(22px,4vw,52px) clamp(14px,3vw,28px) 40px;
+    color:var(--ink);
+    font-family:var(--sans);
+    background:
+      radial-gradient(900px 620px at 18% -8%, rgba(88,56,150,.34), transparent 62%),
+      radial-gradient(760px 560px at 88% 12%, rgba(150,110,58,.16), transparent 60%),
+      radial-gradient(900px 700px at 50% 118%, rgba(54,38,104,.42), transparent 64%),
+      linear-gradient(180deg, var(--bg-0), var(--bg-1) 55%, #0a0718);
+    background-attachment:fixed;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  .sky{
+    position:fixed; inset:0; z-index:0; pointer-events:none; opacity:.9;
+    background-image:
+      radial-gradient(1.2px 1.2px at 26px 40px, rgba(255,255,255,.55), transparent 62%),
+      radial-gradient(1px 1px at 122px 92px, rgba(255,255,255,.34), transparent 62%),
+      radial-gradient(1.7px 1.7px at 170px 26px, rgba(217,185,117,.55), transparent 62%),
+      radial-gradient(1px 1px at 62px 152px, rgba(255,255,255,.28), transparent 62%),
+      radial-gradient(1.3px 1.3px at 196px 176px, rgba(255,255,255,.42), transparent 62%),
+      radial-gradient(1px 1px at 96px 204px, rgba(217,185,117,.34), transparent 62%);
+    background-size:220px 220px;
+    mask-image:radial-gradient(circle at 50% 30%, #000 30%, transparent 85%);
+    -webkit-mask-image:radial-gradient(circle at 50% 30%, #000 30%, transparent 85%);
+  }
+
+  main{
+    position:relative; z-index:1;
+    max-width:760px; margin:0 auto;
+    display:flex; flex-direction:column; gap:clamp(18px,3vw,30px);
+  }
+
+  /* ---------- header ---------- */
+  header{text-align:center; display:flex; flex-direction:column; align-items:center; gap:10px}
+  .orn{
+    display:flex; align-items:center; gap:12px;
+    color:var(--gold); font-size:11px; letter-spacing:.5em;
+  }
+  .orn::before,.orn::after{
+    content:""; width:clamp(28px,7vw,64px); height:1px;
+    background:linear-gradient(90deg, transparent, var(--gold-dim), transparent);
+  }
+  h1{
+    margin:0; font-family:var(--serif); font-weight:500;
+    font-size:clamp(26px,5.4vw,42px); letter-spacing:.22em;
+    color:var(--gold-bright);
+    text-shadow:0 0 26px rgba(217,185,117,.3);
+  }
+  .sub{
+    margin:0; font-size:clamp(10px,2.1vw,12px); letter-spacing:.42em;
+    color:var(--muted); text-transform:uppercase;
+  }
+
+  /* ---------- topics ---------- */
+  .topics{display:flex; flex-direction:column; align-items:center; gap:10px}
+  .topics-label{font-size:11px; letter-spacing:.32em; color:var(--muted)}
+  .topic-list{
+    display:flex; flex-wrap:wrap; justify-content:center; gap:8px;
+    padding:5px; border-radius:999px;
+    background:rgba(255,255,255,.03);
+    border:1px solid var(--line);
+  }
+  .topic{
+    appearance:none; border:0; cursor:pointer; font:inherit;
+    font-size:13px; letter-spacing:.1em; color:var(--muted);
+    padding:9px 17px; border-radius:999px; background:transparent;
+    transition:color .2s ease, background .25s ease, box-shadow .25s ease;
+  }
+  .topic:hover{color:var(--ink)}
+  .topic.active{
+    color:#20180a;
+    background:linear-gradient(180deg,#f0d9a6,#cba95f);
+    box-shadow:0 6px 20px -8px rgba(217,185,117,.8);
+    font-weight:600;
+  }
+
+  /* ---------- cards ---------- */
+  .stage{display:flex; flex-direction:column; align-items:center; gap:clamp(18px,3.2vw,26px)}
+  .cards{
+    display:grid; grid-template-columns:repeat(3, minmax(0,1fr));
+    gap:clamp(8px,2.2vw,22px); width:100%; max-width:660px;
+  }
+  .slot{display:flex; flex-direction:column; gap:9px; align-items:center; min-width:0}
+  .slot-label{
+    font-size:clamp(10px,1.9vw,11.5px); letter-spacing:.3em;
+    color:var(--gold-dim); font-family:var(--serif);
+  }
+
+  .card{
+    width:100%; aspect-ratio:2 / 3.25;
+    perspective:1200px; cursor:default;
+  }
+  .card-inner{
+    position:relative; width:100%; height:100%;
+    transform-style:preserve-3d;
+    transition:transform .78s cubic-bezier(.2,.85,.3,1);
+  }
+  .card.flipped .card-inner{transform:rotateY(180deg)}
+  .card.no-anim .card-inner{transition:none}
+
+  .card-face{
+    position:absolute; inset:0; border-radius:clamp(7px,1.5vw,11px);
+    backface-visibility:hidden; -webkit-backface-visibility:hidden;
+    overflow:hidden;
+  }
+
+  /* back */
+  .card-back{
+    background:
+      radial-gradient(circle at 50% 44%, rgba(217,185,117,.22), transparent 46%),
+      repeating-linear-gradient(45deg, rgba(217,185,117,.10) 0 1px, transparent 1px 8px),
+      repeating-linear-gradient(-45deg, rgba(217,185,117,.07) 0 1px, transparent 1px 11px),
+      linear-gradient(160deg,#2a1f52,#150f2c 55%,#1f1740);
+    box-shadow:
+      inset 0 0 0 1px rgba(217,185,117,.45),
+      inset 0 0 0 5px rgba(12,8,24,.92),
+      inset 0 0 0 6px rgba(217,185,117,.22),
+      0 14px 30px -14px rgba(0,0,0,.9);
+  }
+  .card-back::after{
+    content:"✦";
+    position:absolute; inset:0;
+    display:flex; align-items:center; justify-content:center;
+    font-size:clamp(20px,4.6vw,34px);
+    color:rgba(217,185,117,.75);
+    text-shadow:0 0 18px rgba(217,185,117,.45);
+  }
+
+  /* front */
+  .card-front{
+    transform:rotateY(180deg);
+    background:linear-gradient(165deg,#fcf7ec 0%,#f2e8d5 52%,#e7d9be 100%);
+    color:#2c2337;
+    display:flex; flex-direction:column; align-items:center;
+    padding:clamp(6px,1.6vw,13px) clamp(5px,1.3vw,11px);
+    box-shadow:
+      inset 0 0 0 1px rgba(150,116,60,.55),
+      inset 0 0 0 4px rgba(252,247,236,.9),
+      inset 0 0 0 5px rgba(190,158,98,.4),
+      0 16px 34px -14px rgba(0,0,0,.85);
+  }
+  .card-front::before{
+    content:""; position:absolute; inset:0;
+    background:radial-gradient(circle at 50% 18%, rgba(255,255,255,.85), transparent 58%);
+    pointer-events:none;
+  }
+  .corner{position:absolute; width:clamp(7px,1.6vw,11px); height:clamp(7px,1.6vw,11px); border:1px solid rgba(176,140,74,.6)}
+  .corner.tl{top:clamp(4px,1vw,7px); left:clamp(4px,1vw,7px); border-right:0; border-bottom:0}
+  .corner.tr{top:clamp(4px,1vw,7px); right:clamp(4px,1vw,7px); border-left:0; border-bottom:0}
+  .corner.bl{bottom:clamp(4px,1vw,7px); left:clamp(4px,1vw,7px); border-right:0; border-top:0}
+  .corner.br{bottom:clamp(4px,1vw,7px); right:clamp(4px,1vw,7px); border-left:0; border-top:0}
+
+  .card-rank{
+    font-family:var(--serif); font-size:clamp(11px,2.4vw,17px);
+    letter-spacing:.14em; color:#8a6a33; opacity:.9;
+    margin-top:clamp(2px,.6vw,5px);
+  }
+  .card-art{
+    flex:1; width:100%; display:flex; align-items:center; justify-content:center;
+    color:#5b4a7a; min-height:0;
+  }
+  .card-art svg{width:clamp(30px,8vw,54px); height:auto; display:block; transition:transform .4s ease}
+  .card.rev .card-art svg{transform:rotate(180deg)}
+  .card-meta{text-align:center; width:100%; padding-bottom:clamp(1px,.5vw,4px)}
+  .card-name{
+    font-family:var(--serif); font-size:clamp(12px,2.7vw,19px);
+    letter-spacing:.1em; line-height:1.25;
+  }
+  .card-en{
+    font-size:clamp(6.5px,1.4vw,9.5px); letter-spacing:.09em; text-transform:uppercase;
+    color:#8b7b68; margin-top:3px; line-height:1.3;
+  }
+  .card-ori{
+    display:inline-block; margin-top:clamp(3px,.8vw,6px);
+    font-size:clamp(7.5px,1.5vw,10px); letter-spacing:.18em;
+    padding:2px 7px; border-radius:999px;
+    color:#6d5527; background:rgba(176,140,74,.14);
+    border:1px solid rgba(176,140,74,.35);
+  }
+  .card-ori.rev{color:#8d4b45; background:rgba(150,72,64,.12); border-color:rgba(150,72,64,.35)}
+
+  @keyframes shuf{
+    0%{transform:translateY(0) rotate(0deg)}
+    30%{transform:translateY(-12px) rotate(-3deg)}
+    60%{transform:translateY(2px) rotate(2deg)}
+    100%{transform:translateY(0) rotate(0deg)}
+  }
+  .stage.shuffling .card{animation:shuf .62s cubic-bezier(.3,.8,.4,1) 1 both}
+  .stage.shuffling .slot:nth-child(2) .card{animation-delay:.08s}
+  .stage.shuffling .slot:nth-child(3) .card{animation-delay:.16s}
+
+  /* ---------- draw button ---------- */
+  .draw-btn{
+    appearance:none; font:inherit; cursor:pointer;
+    padding:13px 40px; border-radius:999px;
+    font-size:clamp(13px,2.3vw,15px); letter-spacing:.24em;
+    color:#241a08; font-weight:600;
+    background:linear-gradient(180deg,#f3ddaa,#cdaa60);
+    border:1px solid rgba(255,240,200,.5);
+    box-shadow:0 14px 34px -14px rgba(217,185,117,.85), inset 0 1px 0 rgba(255,255,255,.5);
+    transition:transform .16s ease, box-shadow .25s ease, filter .25s ease;
+  }
+  .draw-btn:hover{filter:brightness(1.05); box-shadow:0 18px 40px -14px rgba(217,185,117,.95), inset 0 1px 0 rgba(255,255,255,.55)}
+  .draw-btn:active{transform:translateY(1px) scale(.99)}
+  .draw-btn:disabled{opacity:.55; cursor:default; transform:none}
+  .hintline{
+    margin:-6px 0 0; font-size:11px; letter-spacing:.2em; color:var(--muted);
+    min-height:1em; transition:opacity .3s ease;
+  }
+
+  /* ---------- reading ---------- */
+  .reading{
+    opacity:0; transform:translateY(14px);
+    transition:opacity .6s ease, transform .6s ease;
+    pointer-events:none;
+    display:flex; flex-direction:column; gap:clamp(18px,3vw,26px);
+  }
+  .reading.show{opacity:1; transform:none; pointer-events:auto}
+
+  .verdict{
+    text-align:center;
+    padding:clamp(18px,3.4vw,28px) clamp(16px,3vw,26px);
+    border-radius:16px;
+    background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.015));
+    border:1px solid var(--line);
+    box-shadow:0 20px 44px -30px rgba(0,0,0,.9);
+  }
+  .stars{
+    font-size:clamp(16px,3.4vw,21px); letter-spacing:.32em;
+    color:var(--gold); text-shadow:0 0 16px rgba(217,185,117,.5);
+  }
+  .vlabel{
+    margin-top:10px; font-family:var(--serif);
+    font-size:clamp(19px,4vw,26px); letter-spacing:.28em;
+    color:var(--gold-bright);
+  }
+  .vtext{
+    margin:10px auto 0; max-width:34em;
+    font-size:clamp(13px,2.4vw,14.5px); line-height:1.95; color:#d8cfc0;
+  }
+
+  .sec-title{
+    display:flex; align-items:center; gap:14px;
+    margin:0; font-family:var(--serif); font-weight:500;
+    font-size:clamp(13px,2.6vw,15px); letter-spacing:.34em; color:var(--gold);
+  }
+  .sec-title::before,.sec-title::after{
+    content:""; flex:1; height:1px;
+    background:linear-gradient(90deg, transparent, var(--gold-dim), transparent);
+  }
+
+  .insights{display:flex; flex-direction:column; gap:12px}
+  .insight{
+    padding:clamp(14px,2.6vw,19px) clamp(15px,2.8vw,22px);
+    border-radius:14px;
+    background:var(--panel);
+    border:1px solid rgba(255,255,255,.06);
+    border-left:2px solid var(--gold-dim);
+  }
+  .insight header{display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:8px; text-align:left}
+  .pos{
+    font-family:var(--serif); font-size:12px; letter-spacing:.24em;
+    color:var(--gold); flex:none;
+  }
+  .cname{font-size:13px; color:#e6ddcc; letter-spacing:.06em}
+  .insight p{
+    margin:0; font-size:clamp(13px,2.35vw,14.5px);
+    line-height:2; color:#c9c0b2;
+  }
+
+  .advice{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:11px}
+  .advice li{
+    position:relative; padding-left:26px;
+    font-size:clamp(13px,2.35vw,14.5px); line-height:1.9; color:#d3cab9;
+  }
+  .advice li::before{
+    content:"✦"; position:absolute; left:4px; top:0;
+    color:var(--gold); font-size:11px; line-height:2.35;
+    text-shadow:0 0 10px rgba(217,185,117,.55);
+  }
+
+  .closing{
+    margin:0; text-align:center; font-family:var(--serif);
+    font-size:clamp(14px,2.6vw,16px); letter-spacing:.18em;
+    color:var(--gold-dim); padding-top:2px;
+  }
+
+  footer{
+    text-align:center; font-size:10.5px; letter-spacing:.16em;
+    color:rgba(157,146,180,.6); line-height:1.9;
+  }
+
+  @media (max-width:520px){
+    .topic{padding:8px 12px; font-size:12px; letter-spacing:.05em}
+    .topic-list{gap:5px; border-radius:20px}
+    .card-en{display:none}
+    .insight header{gap:8px}
+  }
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:.01ms !important; transition-duration:.01ms !important}
+  }
+</style>
+</head>
+<body>
+<div class="sky"></div>
+
+<main>
+  <header>
+    <div class="orn">✦ ✦ ✦</div>
+    <h1>塔罗三牌阵</h1>
+    <p class="sub">Past · Present · Future</p>
+  </header>
+
+  <section class="topics">
+    <span class="topics-label">我想问的是</span>
+    <div class="topic-list" id="topicList"></div>
+  </section>
+
+  <section class="stage" id="stage">
+    <div class="cards" id="cards"></div>
+    <button class="draw-btn" id="drawBtn">洗牌 · 抽三张</button>
+    <p class="hintline" id="hintline">静下心来，想一想你的问题</p>
+  </section>
+
+  <section class="reading" id="reading"></section>
+
+  <footer>塔罗是一面照见内心的镜子 · 结果仅供娱乐与自我觉察</footer>
+</main>
+
+<script>
+(() => {
+  "use strict";
+
+  /* ================= 数据 ================= */
+  const ROMAN = ["0","I","II","III","IV","V","VI","VII","VIII","IX","X","XI","XII","XIII","XIV","XV","XVI","XVII","XVIII","XIX","XX","XXI"];
+
+  const MAJORS = [
+    { name:"愚者", en:"The Fool", up:"带着好奇与信任迈出第一步，未知本身就是礼物", rev:"莽撞或逃避，还没准备好就想起跳", tone:1 },
+    { name:"魔术师", en:"The Magician", up:"你已拥有需要的资源与能力，是时候动手了", rev:"空有想法却迟迟不行动，或低估了自己", tone:2 },
+    { name:"女祭司", en:"The High Priestess", up:"答案在安静里，直觉与内在知识正在指引你", rev:"忽略了内心的声音，或被表象迷惑", tone:0 },
+    { name:"皇后", en:"The Empress", up:"丰盛、滋养与创造力正在流动", rev:"过度付出或依赖，忘了照顾自己", tone:2 },
+    { name:"皇帝", en:"The Emperor", up:"建立秩序与边界，稳定来自掌控", rev:"僵化、控制欲，或缺乏结构", tone:1 },
+    { name:"教皇", en:"The Hierophant", up:"遵循传统与规则，或寻求一位导师的指引", rev:"需要打破旧规则，走出自己的路", tone:0 },
+    { name:"恋人", en:"The Lovers", up:"重要的选择与结合，跟随真正让你心动的东西", rev:"价值观冲突，或逃避选择", tone:2 },
+    { name:"战车", en:"The Chariot", up:"方向明确、意志坚定，你能推动事情前进", rev:"失控、内耗，或用力过猛", tone:1 },
+    { name:"力量", en:"Strength", up:"以温柔而坚定的方式驯服内心的恐惧", rev:"自我怀疑，或被情绪反噬", tone:1 },
+    { name:"隐者", en:"The Hermit", up:"向内寻找答案，独处会让你看清方向", rev:"过度封闭，或逃避与人接触", tone:0 },
+    { name:"命运之轮", en:"Wheel of Fortune", up:"周期正在转动，机会来了，顺势而为", rev:"时运不济，或抗拒改变", tone:1 },
+    { name:"正义", en:"Justice", up:"因果与平衡，诚实面对会带来公正的结果", rev:"逃避责任，或结果失衡", tone:0 },
+    { name:"倒吊人", en:"The Hanged Man", up:"暂停与换位思考，牺牲换来新的视角", rev:"无谓的等待，或不愿放下", tone:-1 },
+    { name:"死神", en:"Death", up:"一个阶段结束，为新的开始腾出空间", rev:"抗拒结束，拖着一个已经死去的东西", tone:-1 },
+    { name:"节制", en:"Temperance", up:"调和与耐心，找到属于自己的节奏", rev:"失衡、极端，或急于求成", tone:1 },
+    { name:"恶魔", en:"The Devil", up:"欲望与执念把你绑住，看清它才能解开", rev:"开始挣脱束缚，重新拿回主动权", tone:-2 },
+    { name:"塔", en:"The Tower", up:"突如其来的崩塌，摧毁的是本就不稳的东西", rev:"延迟的崩塌，或从废墟中重建", tone:-2 },
+    { name:"星星", en:"The Star", up:"希望与疗愈，你正走在正确的方向上", rev:"失去信心，需要重新连接内心的光", tone:2 },
+    { name:"月亮", en:"The Moon", up:"迷雾与不安，别急着在情绪里做决定", rev:"迷雾散去，真相逐渐清晰", tone:-1 },
+    { name:"太阳", en:"The Sun", up:"清晰、喜悦与成功，事情会明朗起来", rev:"短暂的阴云，快乐被延迟但不会缺席", tone:2 },
+    { name:"审判", en:"Judgement", up:"觉醒与召唤，是时候回应内心真正的渴望", rev:"自我怀疑，或迟迟不肯做出回应", tone:1 },
+    { name:"世界", en:"The World", up:"圆满与完成，一个周期画上句号", rev:"差最后一步，或不愿结束", tone:2 }
+  ];
+
+  const SUITS = {
+    wands: {
+      name:"权杖", en:"Wands", advice:"带着热情去做，但先给行动定一个明确的第一步。",
+      cards:[
+        ["灵感迸发，新的机会与冲劲同时出现","计划延迟，热情受挫，方向感丢失",2],
+        ["开始规划远方，站在自己的位置上眺望","缺乏计划，犹豫不前，机会在观望中溜走",0],
+        ["目光放远，等待先前投入的回报","短视或进展受阻，视野被眼前的事挡住",1],
+        ["庆祝阶段性的成果，基础已经稳固","庆祝被推迟，内在的不安定感浮现",1],
+        ["竞争与摩擦，但也逼出了你的斗志","冲突开始化解，学会避开无谓的争斗",-1],
+        ["胜利与认可，你的努力被看见","自负或胜利延迟，别把功劳全揽在身上",2],
+        ["坚守立场，你在为自己的位置而战","疲于应付，开始怀疑是否值得继续",0],
+        ["迅速推进，消息与进展接连而来","延迟与沟通不畅，节奏被打乱",1],
+        ["带伤坚持，离终点只差最后一段","过度防备，精疲力竭，该休整了",0],
+        ["负担过重，责任压得你喘不过气","学会放下与分担，重担开始减轻",-1],
+        ["热情的消息或新的灵感降临","三分钟热度，或收到让人失望的消息",0],
+        ["冒险行动，凭着直觉冲出去","鲁莽或半途而废，冲动需要刹车",1],
+        ["自信而有魅力，你能带动周围的人","嫉妒与自我怀疑，光芒被自己遮住",2],
+        ["远见与魄力，你能扛起全局","独断急躁，听不进不同的声音",2]
+      ]
+    },
+    cups: {
+      name:"圣杯", en:"Cups", advice:"相信你的直觉，它比你以为的更准确。",
+      cards:[
+        ["情感的新开始，爱意与直觉同时苏醒","情感封闭，或感到失落与空虚",2],
+        ["彼此吸引，一段关系正在靠近","关系失衡，或出现分歧与误解",2],
+        ["友谊与庆祝，你被温柔地围绕着","过度放纵，或困在狭小的圈子里",2],
+        ["有些冷淡，对眼前的邀请提不起兴趣","重新接纳，正从低潮中走出来",-1],
+        ["失落与遗憾，目光停留在打翻的杯子上","开始接受过去，悲伤正在退潮",-2],
+        ["怀旧与纯真，旧人旧事带来暖意","沉溺过去，成长因此停滞",1],
+        ["幻想与选择太多，一时看不清现实","认清现实，终于做出取舍",0],
+        ["转身离开，去追寻更有意义的东西","害怕改变，在门口反复徘徊",-1],
+        ["满足与愿望实现，你享受当下的丰盛","虚假的满足，或贪欲开始膨胀",2],
+        ["圆满的情感，家庭与关系和谐","关系破裂或理想破灭，需要重新理解幸福",2],
+        ["情感的消息或灵感传来，心是柔软的","情绪化或逃避现实，躲进幻想里",0],
+        ["浪漫的追求与邀约，跟随心意","空头承诺，或情绪起伏不定",1],
+        ["温柔共情，你的直觉能安抚别人","情绪泛滥或过度依赖，界限模糊",1],
+        ["情感成熟，能包容也能承担","情感操控，或表面温和实则冷漠",1]
+      ]
+    },
+    swords: {
+      name:"宝剑", en:"Swords", advice:"把问题写下来，清晰的思路能切断一半焦虑。",
+      cards:[
+        ["思维清晰，一次关键的突破正在发生","思绪混乱，判断失误，先别急着下结论",1],
+        ["僵局与两难，蒙着眼做选择","信息过载，用忙碌逃避决定",-1],
+        ["心痛与伤害，有些话真的伤到了你","疗愈开始，痛苦正在被释放",-2],
+        ["停下来休息，恢复比坚持更重要","焦躁不安，无法真正静下来",0],
+        ["冲突与得失之争，赢了也未必开心","和解与放下，退出无意义的争执",-2],
+        ["过渡期，正在离开一段困境","停滞不前，难以摆脱旧局面",1],
+        ["策略与隐瞒，有些事没有摊开说","真相揭露，或发现自己一直在自欺",-1],
+        ["被困住，限制更多来自你的想法","看清出路，绳索正在松开",-2],
+        ["焦虑与失眠，脑子停不下来","走出恐惧，开始向人求助",-2],
+        ["一个阶段结束，已经跌到谷底","重生，最坏的时刻已经过去",-2],
+        ["好奇而敏锐，适合学习与提问","流言与口舌，言语可能伤人",0],
+        ["果断行动，说话直接","鲁莽或言辞冲突，容易得罪人",0],
+        ["理性独立，能冷静地看清局面","冷漠刻薄，用理智筑起高墙",1],
+        ["权威与理智，判断力值得信赖","专制或滥用理性，忽略了他人的感受",1]
+      ]
+    },
+    pentacles: {
+      name:"星币", en:"Pentacles", advice:"回到具体的事情上，一步一个脚印比空想有效。",
+      cards:[
+        ["物质层面的新机会，资源正在到位","机会流失，财务或现实基础不稳",1],
+        ["灵活平衡，你在同时应付几件事","失衡，分身乏术，需要做减法",1],
+        ["合作与专业能力被认可","缺乏协作，或质量不如预期",1],
+        ["保守守成，先守住已有的东西","贪婪或过度控制，抓得太紧反而失去",0],
+        ["匮乏与困境，感到被排除在外","走出困境，援助正在靠近",-2],
+        ["给予与接受，慷慨让关系流动","施舍失衡，或陷入人情与债务",1],
+        ["耐心投入，长期主义开始有回报","急于求成，或白费力气",0],
+        ["专注精进，把一件事做到熟练","重复劳动，缺乏真正的进步",1],
+        ["丰盛与独立，你享受自己的成果","过度依赖或虚荣，用外物填补内心",2],
+        ["家族与传承，富足而稳固","财务纠纷，或根基并不牢靠",2],
+        ["务实的新开始，适合学习一项技能","拖延或不切实际，计划停在纸上",1],
+        ["稳健推进，你是可靠的那个人","停滞，过于保守，错过了时机",1],
+        ["务实而体贴，能把生活照顾妥当","忽略自己，或被物质焦虑困住",1],
+        ["富足与稳健，你有能力经营长期的事","固执或物质至上，把价值等同于价格",1]
+      ]
+    }
+  };
+
+  const RANK_CN = ["王牌","二","三","四","五","六","七","八","九","十","侍从","骑士","王后","国王"];
+  const RANK_EN = ["Ace","Two","Three","Four","Five","Six","Seven","Eight","Nine","Ten","Page","Knight","Queen","King"];
+  const RANK_MARK = ["A","2","3","4","5","6","7","8","9","10","侍","骑","后","王"];
+
+  /* ================= 方向 ================= */
+  const TOPICS = {
+    love: {
+      name:"爱情", focus:"感情",
+      level:[
+        "这段时间感情上容易有摩擦与误会，先别急着做决定。",
+        "关系的温度忽冷忽热，需要你主动沟通才能稳住。",
+        "没有大起大落，是一段适合慢慢了解彼此的时期。",
+        "心意正在靠近，坦诚表达会让关系更进一步。",
+        "感情的能量很顺，适合确认关系或推进重要的共同计划。"
+      ],
+      advice:[
+        "把「我以为」换成直接问一句，误会会少一半。",
+        "先照顾好自己的情绪，再去处理两个人的问题。",
+        "别用试探代替表达，想要什么就说出来。",
+        "给彼此留一点空间，亲密不等于时时黏在一起。",
+        "写下你真正在意的三件事，再决定要不要坚持。"
+      ]
+    },
+    career: {
+      name:"事业", focus:"工作",
+      level:[
+        "阻力明显，先守住基本盘，不宜冒进或轻易跳槽。",
+        "方向还不够清晰，先把手上的事做扎实再谈扩张。",
+        "按部就班会有稳定产出，是积累口碑的阶段。",
+        "机会正在浮现，主动争取会得到意想不到的支持。",
+        "势头很好，适合推进关键项目或正式提出你的方案。"
+      ],
+      advice:[
+        "把目标拆成这周就能完成的三件小事。",
+        "主动向上级或合作方同步进展，别让信息停在你这儿。",
+        "先做出一个可展示的成果，比反复论证更有说服力。",
+        "留意那些愿意给你资源的人，主动约一次沟通。",
+        "把「等准备好」换成「先做一个最小版本」。"
+      ]
+    },
+    money: {
+      name:"财运", focus:"财务状况",
+      level:[
+        "现金流偏紧，避免冲动消费与高风险投入。",
+        "收支起伏较大，需要重新梳理固定支出。",
+        "财务状态平稳，适合做长期规划而非短线操作。",
+        "有进账或回报的机会，稳健配置会有不错的结果。",
+        "财路通畅，适合谈回报、签合同或启动储蓄计划。"
+      ],
+      advice:[
+        "先把三个月的应急金单独放好，再考虑其他安排。",
+        "任何「稳赚不赔」的说法都值得你多想一晚。",
+        "给自己设一个消费冷静期，超过预算就等 48 小时。",
+        "把固定支出列一遍，你会找到可以省下的地方。",
+        "把注意力放回能力本身，收入是能力的滞后指标。"
+      ]
+    },
+    social: {
+      name:"人际", focus:"人际关系",
+      level:[
+        "容易卷入是非或被人误解，少说多做、保持距离。",
+        "关系中有微妙的拉扯，需要你划清界限。",
+        "人际环境平淡，维持现状即可，不必刻意讨好。",
+        "会有人主动靠近或伸出援手，值得真诚回应。",
+        "人缘顺畅，适合修复旧关系或结识重要的新朋友。"
+      ],
+      advice:[
+        "把「他是不是不喜欢我」换成「我需要什么」。",
+        "对消耗你的关系，礼貌但坚定地说不。",
+        "主动感谢一个帮过你的人，关系会更牢。",
+        "少在背后议论，话传一圈会变成另一个版本。",
+        "找一个可以坦诚说话的人，别把情绪都自己扛。"
+      ]
+    },
+    growth: {
+      name:"成长", focus:"内在状态",
+      level:[
+        "内在有些疲惫，先允许自己停下来，而不是逼自己前进。",
+        "你在旧模式和新的自己之间摇摆，这是正常的过渡。",
+        "正在慢慢沉淀，改变不会立刻显现，但方向是对的。",
+        "你开始看清自己真正想要的，行动会带来确认。",
+        "内外一致的状态，正适合做一次重要的自我升级。"
+      ],
+      advice:[
+        "每天留十分钟，不输入任何信息，只听自己的声音。",
+        "写下最近一次让你感到「这就是我」的瞬间。",
+        "别用别人的进度表衡量自己的节奏。",
+        "把一件拖了很久的小事做完，你会重新相信自己。",
+        "允许自己改变主意，那不代表你之前错了。"
+      ]
+    },
+    study: {
+      name:"学业", focus:"学习",
+      level:[
+        "注意力涣散，先调整作息，别硬撑着刷时长。",
+        "状态时好时坏，需要更清晰的学习节奏。",
+        "按计划推进会有稳定积累，是打基础的阶段。",
+        "理解力在线，适合攻克之前的难点。",
+        "进入状态了，适合冲刺重要考试或提交成果。"
+      ],
+      advice:[
+        "用「讲给别人听」检验自己是否真的懂了。",
+        "把大任务切成 25 分钟一段，先开始再说。",
+        "错题比新题更有价值，回头看看你总错的那一类。",
+        "找一个一起学习的人，互相监督比自律更可靠。",
+        "别在疲惫时做重要判断，先睡一觉。"
+      ]
+    }
+  };
+
+  const POSITIONS = [
+    { label:"过去", templates:[
+      "过去的底色是「{m}」。它塑造了你现在的处境，也解释了事情为什么会走到这一步。",
+      "回头看，这段经历的关键词是「{m}」。它留下的影响，至今仍在悄悄起作用。",
+      "过去的牌面落在「{m}」上。那段经历，是你现在做判断时最直接的参照。"
+    ]},
+    { label:"现在", templates:[
+      "此刻你正处在「{m}」的状态里。这是整个牌阵的重心，也是你真正能着力的地方。",
+      "现在，事情的核心是「{m}」。它可能让你安心，也可能让你不安，但它是真实的。",
+      "当下的能量集中在「{m}」。你感受到的阻力或顺流，都从这里来。"
+    ]},
+    { label:"未来", templates:[
+      "顺着现在的节奏走下去，趋势指向「{m}」。这是一条提醒，不是判决。",
+      "如果保持现在的选择，接下来会走向「{m}」。牌面把选择权仍然留给你。",
+      "未来的牌落在「{m}」上。它更像一个方向，而不是一个确定的结局。"
+    ]}
+  ];
+
+  const LV_LABEL = ["逆风","起伏","平稳","向好","顺遂"];
+  const LV_CLOSING = [
+    "先照顾好自己，再谈其他。",
+    "起伏是常态，稳住自己的节奏。",
+    "不必着急，时间站在你这边。",
+    "路正在变亮，继续走。",
+    "风已经起了，扬帆就好。"
+  ];
+
+  const SUIT_ADVICE = {
+    major:"这是一个重要的转折点，值得你认真对待内心的声音。",
+    wands:"带着热情去做，但先给行动定一个明确的第一步。",
+    cups:"相信你的直觉，它比你以为的更准确。",
+    swords:"把问题写下来，清晰的思路能切断一半焦虑。",
+    pentacles:"回到具体的事情上，一步一个脚印比空想有效。"
+  };
+
+  /* ================= 牌组 ================= */
+  function buildDeck() {
+    const deck = [];
+    MAJORS.forEach((m, i) => {
+      deck.push({
+        kind:"major", name:m.name, en:m.en, mark:ROMAN[i],
+        up:m.up, rev:m.rev, tone:m.tone
+      });
+    });
+    Object.keys(SUITS).forEach((key) => {
+      const suit = SUITS[key];
+      suit.cards.forEach((c, i) => {
+        deck.push({
+          kind:key,
+          name:suit.name + RANK_CN[i],
+          en:RANK_EN[i] + " of " + suit.en,
+          mark:RANK_MARK[i],
+          up:c[0], rev:c[1], tone:c[2]
+        });
+      });
+    });
+    return deck;
+  }
+
+  /* ================= 图标 ================= */
+  const ICONS = {
+    major:`<svg viewBox="0 0 48 48" fill="none" stroke="currentColor">
+      <circle cx="24" cy="24" r="15" stroke-width="1.1" opacity=".7"/>
+      <path d="M24 5l3.4 13.1L41 21.5 27.4 24.5 24 38l-3.4-13.5L7 21.5l13.6-3.4z" fill="currentColor" stroke="none" opacity=".85"/>
+      <circle cx="24" cy="24" r="2.2" fill="#fcf7ec" stroke="none"/>
+    </svg>`,
+    wands:`<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-linecap="round">
+      <path d="M24 41V18" stroke-width="2.4"/>
+      <path d="M24 18c0-5 3.6-8 3.6-8s1 4.4-1.2 8" stroke-width="1.8"/>
+      <path d="M24 22c-4 0-6.5 2.4-6.5 2.4s3.4 1.6 6.5-.6" stroke-width="1.6"/>
+      <circle cx="24" cy="12" r="3.4" fill="currentColor" stroke="none"/>
+    </svg>`,
+    cups:`<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-linecap="round">
+      <path d="M14 10h20v7a10 10 0 0 1-20 0z" stroke-width="2.2"/>
+      <path d="M24 27v9" stroke-width="2.2"/>
+      <path d="M16 40h16" stroke-width="2.2"/>
+      <path d="M18 15h12" stroke-width="1.2" opacity=".55"/>
+    </svg>`,
+    swords:`<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-linecap="round">
+      <path d="M24 4l3 28h-6z" fill="currentColor" stroke="none" opacity=".9"/>
+      <path d="M15 32h18" stroke-width="2.2"/>
+      <path d="M24 32v9" stroke-width="2.2"/>
+      <circle cx="24" cy="43" r="1.8" fill="currentColor" stroke="none"/>
+    </svg>`,
+    pentacles:`<svg viewBox="0 0 48 48" fill="none" stroke="currentColor">
+      <circle cx="24" cy="24" r="16" stroke-width="1.6"/>
+      <polygon points="24,8 27.88,21.41 41.61,21.53 30.54,29.79 34.39,43.07 24,35.2 13.61,43.07 17.46,29.79 6.39,21.53 20.12,21.41"
+        fill="currentColor" stroke="none" opacity=".85"/>
+    </svg>`
+  };
+
+  /* ================= 工具 ================= */
+  const $ = (id) => document.getElementById(id);
+
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function hashStr(s) {
+    let h = 2166136261;
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return h >>> 0;
+  }
+  function sample(arr, n, rnd) {
+    const pool = arr.slice();
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(rnd() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    return pool.slice(0, n);
+  }
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  /* ================= 状态 ================= */
+  const deck = buildDeck();
+  let topic = "love";
+  let current = null;      // { cards: [], seed: number }
+  let busy = false;
+
+  /* ================= 初始化界面 ================= */
+  const topicList = $("topicList");
+  Object.keys(TOPICS).forEach((key) => {
+    const b = document.createElement("button");
+    b.className = "topic" + (key === topic ? " active" : "");
+    b.dataset.key = key;
+    b.textContent = TOPICS[key].name;
+    topicList.appendChild(b);
+  });
+
+  const cardsEl = $("cards");
+  const slotLabels = ["过去", "现在", "未来"];
+  const cardNodes = [];
+  for (let i = 0; i < 3; i++) {
+    const slot = document.createElement("div");
+    slot.className = "slot";
+    slot.innerHTML =
+      '<div class="slot-label">' + slotLabels[i] + '</div>' +
+      '<div class="card">' +
+        '<div class="card-inner">' +
+          '<div class="card-face card-back"></div>' +
+          '<div class="card-face card-front"></div>' +
+        '</div>' +
+      '</div>';
+    cardsEl.appendChild(slot);
+    cardNodes.push(slot.querySelector(".card"));
+  }
+
+  /* ================= 抽牌 ================= */
+  function drawCards() {
+    const pool = deck.slice();
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    return pool.slice(0, 3).map((c) => ({ ...c, reversed: Math.random() < 0.5 }));
+  }
+
+  function fillCard(node, card) {
+    const front = node.querySelector(".card-front");
+    front.innerHTML =
+      '<span class="corner tl"></span><span class="corner tr"></span>' +
+      '<span class="corner bl"></span><span class="corner br"></span>' +
+      '<div class="card-rank">' + card.mark + '</div>' +
+      '<div class="card-art">' + ICONS[card.kind] + '</div>' +
+      '<div class="card-meta">' +
+        '<div class="card-name">' + card.name + '</div>' +
+        '<div class="card-en">' + card.en + '</div>' +
+        '<div class="card-ori' + (card.reversed ? " rev" : "") + '">' + (card.reversed ? "逆位" : "正位") + '</div>' +
+      '</div>';
+    node.classList.toggle("rev", card.reversed);
+    node.setAttribute("aria-label", card.name + (card.reversed ? " 逆位" : " 正位"));
+  }
+
+  function resetCards() {
+    cardNodes.forEach((n) => {
+      n.classList.add("no-anim");
+      n.classList.remove("flipped", "rev");
+    });
+    void document.body.offsetWidth;
+    cardNodes.forEach((n) => n.classList.remove("no-anim"));
+  }
+
+  async function doDraw() {
+    if (busy) return;
+    busy = true;
+
+    const btn = $("drawBtn");
+    const hint = $("hintline");
+    const reading = $("reading");
+    btn.disabled = true;
+    btn.textContent = "洗牌中…";
+    reading.classList.remove("show");
+    reading.innerHTML = "";
+    hint.style.opacity = "0";
+
+    resetCards();
+    const stage = $("stage");
+    stage.classList.add("shuffling");
+    await sleep(660);
+    stage.classList.remove("shuffling");
+
+    const cards = drawCards();
+    current = { cards, seed: hashStr(cards.map((c) => c.name + (c.reversed ? "R" : "U")).join("|") + topic) };
+
+    for (let i = 0; i < 3; i++) {
+      fillCard(cardNodes[i], cards[i]);
+      await sleep(120);
+      cardNodes[i].classList.add("flipped");
+      await sleep(340);
+    }
+
+    renderReading();
+    reading.classList.add("show");
+    btn.disabled = false;
+    btn.textContent = "再抽一次";
+    hint.style.opacity = "1";
+    hint.textContent = "牌已展开 · 也可以换个方向再看一次";
+    busy = false;
+  }
+
+  /* ================= 解读 ================= */
+  function levelOf(score) {
+    if (score >= 4) return 4;
+    if (score >= 2) return 3;
+    if (score >= -1) return 2;
+    if (score >= -3) return 1;
+    return 0;
+  }
+
+  function renderReading() {
+    if (!current) return;
+    const t = TOPICS[topic];
+    const cards = current.cards;
+    const rnd = mulberry32(current.seed ^ hashStr(topic));
+    const pick = (arr) => arr[Math.floor(rnd() * arr.length)];
+
+    const score = cards.reduce((s, c) => s + (c.reversed ? -c.tone : c.tone), 0);
+    const lvl = levelOf(score);
+    const stars = "★".repeat(lvl + 1) + "☆".repeat(4 - lvl);
+
+    const blocks = cards.map((c, i) => {
+      const pos = POSITIONS[i];
+      const meaning = c.reversed ? c.rev : c.up;
+      return {
+        pos: pos.label,
+        title: c.name + " · " + (c.rev ? "逆位" : "正位"),
+        text: pick(pos.templates).replace("{m}", meaning)
+      };
+    });
+
+    const tips = sample(t.advice, 2, rnd);
+    tips.push(SUIT_ADVICE[cards[2].kind] || SUIT_ADVICE.major);
+
+    const html =
+      '<div class="verdict">' +
+        '<div class="stars">' + stars + '</div>' +
+        '<div class="vlabel">' + LV_LABEL[lvl] + '</div>' +
+        '<p class="vtext">' + t.level[lvl] + '</p>' +
+      '</div>' +
+      '<h3 class="sec-title">牌面解读</h3>' +
+      '<div class="insights">' +
+        blocks.map((b) =>
+          '<article class="insight">' +
+            '<header><span class="pos">' + b.pos + '</span><span class="cname">' + b.title + '</span></header>' +
+            '<p>' + b.text + '</p>' +
+          '</article>'
+        ).join("") +
+      '</div>' +
+      '<h3 class="sec-title">给你的建议</h3>' +
+      '<ul class="advice">' + tips.map((a) => "<li>" + a + "</li>").join("") + '</ul>' +
+      '<p class="closing">' + LV_CLOSING[lvl] + '</p>';
+
+    $("reading").innerHTML = html;
+  }
+
+  /* ================= 交互 ================= */
+  topicList.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-key]");
+    if (!btn || busy) return;
+    topic = btn.dataset.key;
+    [...topicList.children].forEach((b) => b.classList.toggle("active", b === btn));
+    if (current) {
+      current.seed = hashStr(current.cards.map((c) => c.name + (c.reversed ? "R" : "U")).join("|") + topic);
+      renderReading();
+      $("reading").classList.add("show");
+    }
+  });
+
+  $("drawBtn").addEventListener("click", doDraw);
+
+  // 首次进入：先展示三张背面，点按钮开始
+  resetCards();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+{
+  "name": "lowpoly-island",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Low-poly 3D open-world exploration game built with Three.js + TypeScript + Vite",
+  "scripts": {
+    "dev": "vite",
+    "build": "npm run typecheck && vite build",
+    "build:single": "npm run typecheck && vite build --mode single && node scripts/postbuild-single.mjs",
+    "preview": "vite preview --port 4173 --host",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "@types/three": "^0.186.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.4",
+    "vite-plugin-singlefile": "^2.3.4",
+    "vitest": "^5.0.5"
+  }
+}

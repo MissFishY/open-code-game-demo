@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>低多边形小岛</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏝️</text></svg>" />
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="game-canvas"></canvas>
+
+      <!-- 抬头显示 ------------------------------------------------------- -->
+      <div id="ui" aria-live="polite">
+        <section id="objective-panel" class="panel panel--objective">
+          <h2 class="panel__title">当前目标</h2>
+          <p id="objective-text">去和岛上的居民聊聊。</p>
+          <p id="objective-progress" class="panel__muted"></p>
+        </section>
+
+        <section id="stats-panel" class="panel panel--stats">
+          <div class="stat"><span class="stat__label">木材</span><span id="stat-wood" class="stat__value">0</span></div>
+          <div class="stat"><span class="stat__label">芦苇</span><span id="stat-fiber" class="stat__value">0</span></div>
+          <div class="stat"><span class="stat__label">水晶</span><span id="stat-crystal" class="stat__value">0</span></div>
+          <div class="stat"><span class="stat__label">携带</span><span id="stat-total" class="stat__value">0</span></div>
+          <div class="stat"><span class="stat__label">温馨度</span><span id="stat-cozy" class="stat__value">0</span></div>
+          <div class="stat"><span class="stat__label">钱币</span><span id="stat-coins" class="stat__value">0</span></div>
+          <div class="stat"><span class="stat__label">时间</span><span id="stat-time" class="stat__value">第 1 天</span></div>
+          <div class="stat"><span class="stat__label">天气</span><span id="stat-weather" class="stat__value">晴</span></div>
+        </section>
+
+        <div id="hud-buttons" class="hud-buttons">
+          <button type="button" class="hud-button" data-panel="saves">💾 存档</button>
+          <button type="button" class="hud-button" data-panel="inventory">🎒 背包</button>
+          <button type="button" class="hud-button" data-panel="journal">📖 日志</button>
+        </div>
+
+        <section id="stamina-panel" class="stamina">
+          <div class="stamina__bar"><div id="stamina-fill" class="stamina__fill"></div></div>
+          <span id="stamina-label" class="stamina__label">体力 100/100</span>
+        </section>
+
+        <div id="resume-hint" class="resume-hint hidden">点击画面继续游戏（鼠标视角）</div>
+
+        <div id="prompt" class="prompt hidden">
+          <span class="prompt__key">E</span>
+          <span id="prompt-text">交互</span>
+        </div>
+
+        <div id="toasts" class="toasts"></div>
+
+        <section id="help-panel" class="panel panel--help">
+          <h2 class="panel__title">操作</h2>
+          <ul>
+            <li><b>WASD</b> 移动</li>
+            <li><b>鼠标</b> 转视角（点一下画面）</li>
+            <li><b>Shift</b> 冲刺</li>
+            <li><b>空格</b> 跳跃</li>
+            <li><b>E</b> 交互 / 对话</li>
+            <li><b>Tab</b> 背包</li>
+            <li><b>J</b> 日志</li>
+            <li><b>Esc</b> 关闭面板 / 释放鼠标</li>
+          </ul>
+        </section>
+
+        <!-- 对话 ---------------------------------------------------------->
+        <section id="dialogue" class="dialogue hidden">
+          <header class="dialogue__header">
+            <h2 id="dialogue-speaker">Tallis</h2>
+            <span id="dialogue-role" class="dialogue__role">护林员</span>
+          </header>
+          <p id="dialogue-text"></p>
+          <div id="dialogue-choices" class="dialogue__choices"></div>
+        </section>
+
+        <!-- 背包 ---------------------------------------------------------->
+        <section id="inventory" class="inventory hidden">
+          <button class="panel-close" type="button" data-close="inventory" aria-label="关闭">✕</button>
+          <h2 class="inventory__title">背包</h2>
+          <ul id="inventory-list" class="inventory__list"></ul>
+          <p class="inventory__hint">按 <b>Tab</b> 关闭</p>
+        </section>
+
+        <!-- 制作台 ------------------------------------------------------->
+        <section id="crafting" class="panel-box hidden">
+          <button class="panel-close" type="button" data-close="crafting" aria-label="关闭">✕</button>
+          <h2 class="panel-box__title">制作台</h2>
+          <p class="panel-box__sub">把采集来的材料做成有用的东西。</p>
+          <ul id="crafting-list" class="recipe-list"></ul>
+          <p class="panel-box__hint">按 <b>Tab</b> 或 <b>Esc</b> 关闭</p>
+        </section>
+
+        <!-- 建造 ---------------------------------------------------------->
+        <section id="building" class="panel-box hidden">
+          <button class="panel-close" type="button" data-close="building" aria-label="关闭">✕</button>
+          <h2 class="panel-box__title">建造</h2>
+          <p id="building-name" class="panel-box__sub"></p>
+          <p id="building-desc" class="panel-box__desc"></p>
+          <ul id="building-list" class="recipe-list"></ul>
+          <div class="panel-box__actions">
+            <button id="btn-build" class="button button--primary" type="button">开始建造</button>
+          </div>
+          <p class="panel-box__hint">按 <b>Tab</b> 或 <b>Esc</b> 关闭</p>
+        </section>
+
+        <!-- 装饰 ---------------------------------------------------------->
+        <section id="decor" class="panel-box hidden">
+          <button class="panel-close" type="button" data-close="decor" aria-label="关闭">✕</button>
+          <h2 class="panel-box__title">布置小屋</h2>
+          <p class="panel-box__sub">让这里有点家的样子。</p>
+          <div class="cozy">
+            <div class="cozy__bar"><div id="cozy-fill" class="cozy__fill"></div></div>
+            <div class="cozy__meta">
+              <span id="cozy-value">温馨度 0 / 14</span>
+              <span id="cozy-title">属于你自己的地方</span>
+            </div>
+          </div>
+          <h3 class="panel-box__section">已放置</h3>
+          <ul id="decor-placed" class="recipe-list"></ul>
+          <h3 class="panel-box__section">可放置</h3>
+          <ul id="decor-owned" class="recipe-list"></ul>
+          <p class="panel-box__hint">按 <b>Tab</b> 或 <b>Esc</b> 关闭</p>
+        </section>
+
+        <!-- 小屋 ---------------------------------------------------------->
+        <section id="home" class="panel-box hidden">
+          <button class="panel-close" type="button" data-close="home" aria-label="关闭">✕</button>
+          <h2 class="panel-box__title">你的小屋</h2>
+          <p id="home-text" class="panel-box__sub"></p>
+          <p id="home-detail" class="panel-box__desc"></p>
+          <div class="panel-box__actions">
+            <button id="btn-rest" class="button button--primary" type="button">休息并保存</button>
+            <button id="btn-home-decor" class="button" type="button">布置</button>
+            <button id="btn-home-craft" class="button" type="button">制作</button>
+            <button id="btn-home-inv" class="button" type="button">打开背包</button>
+          </div>
+          <p class="panel-box__hint">按 <b>Tab</b> 或 <b>Esc</b> 关闭</p>
+        </section>
+
+        <!-- 商店 ---------------------------------------------------------->
+        <section id="shop" class="panel-box hidden">
+          <button class="panel-close" type="button" data-close="shop" aria-label="关闭">✕</button>
+          <h2 id="shop-title" class="panel-box__title">铺子</h2>
+          <p id="shop-hint" class="panel-box__sub">卖鱼换钱。</p>
+          <h3 class="panel-box__section">他卖的东西</h3>
+          <ul id="shop-list" class="recipe-list"></ul>
+          <h3 class="panel-box__section">你带的鱼</h3>
+          <ul id="shop-sell" class="recipe-list"></ul>
+          <h3 class="panel-box__section">你的工具</h3>
+          <ul id="shop-tools" class="recipe-list"></ul>
+          <p class="panel-box__hint">按 <b>Tab</b> 或 <b>Esc</b> 关闭</p>
+        </section>
+
+        <!-- 钓鱼 ---------------------------------------------------------->
+        <section id="fishing" class="panel-box panel-box--fishing hidden">
+          <button class="panel-close" type="button" data-close="fishing" aria-label="关闭">✕</button>
+          <h2 class="panel-box__title">钓鱼</h2>
+          <p id="fishing-status" class="panel-box__sub">等待鱼上钩……</p>
+          <p id="fishing-hint" class="panel-box__hint hint-strong">按 E 抛竿。</p>
+          <div class="fish-bar">
+            <div id="fishing-target" class="fish-bar__target"></div>
+            <div id="fishing-marker" class="fish-bar__marker"></div>
+          </div>
+          <p class="panel-box__hint">按 <b>E</b> 收线 · <b>Esc</b> 停止</p>
+        </section>
+
+        <!-- 屋内 ---------------------------------------------------------->
+        <section id="interior" class="panel-box hidden">
+          <button class="panel-close" type="button" data-close="interior" aria-label="关闭">✕</button>
+          <h2 class="panel-box__title">你的小屋内部</h2>
+          <h3 class="panel-box__section">已摆放的家具</h3>
+          <ul id="interior-furniture" class="recipe-list"></ul>
+          <h3 class="panel-box__section">购买与扩建</h3>
+          <ul id="interior-expansions" class="recipe-list"></ul>
+          <p class="panel-box__hint">按 <b>Tab</b> 或 <b>Esc</b> 关闭</p>
+        </section>
+
+        <!-- 日志 ---------------------------------------------------------->
+        <section id="journal" class="panel-box hidden">
+          <button class="panel-close" type="button" data-close="journal" aria-label="关闭">✕</button>
+          <h2 class="panel-box__title">日志</h2>
+          <ul id="journal-list" class="recipe-list"></ul>
+          <p id="journal-trust" class="panel-box__desc"></p>
+          <p class="panel-box__hint">按 <b>Tab</b> 或 <b>Esc</b> 关闭</p>
+        </section>
+
+        <!-- 标题 / 开始 --------------------------------------------------->
+        <section id="title-screen" class="overlay">
+          <div class="overlay__panel">
+            <h1 class="overlay__title">低多边形小岛</h1>
+            <p class="overlay__subtitle">一个开放世界探索游戏</p>
+            <div class="overlay__buttons">
+              <button id="btn-continue" class="button button--primary" type="button">继续游戏</button>
+              <button id="btn-new" class="button" type="button">新的开始</button>
+            </div>
+            <p class="overlay__hint">
+              <b>WASD</b> 移动 · <b>鼠标</b> 转视角 · <b>E</b> 交互 · <b>Tab</b> 背包
+            </p>
+            <p id="title-status" class="overlay__status"></p>
+          </div>
+        </section>
+
+        <section id="loading-screen" class="overlay overlay--solid">
+          <div class="overlay__panel">
+            <h1 class="overlay__title">低多边形小岛</h1>
+            <p id="loading-text" class="overlay__subtitle">正在抬起岛屿……</p>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
