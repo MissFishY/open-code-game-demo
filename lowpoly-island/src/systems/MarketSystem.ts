@@ -11,12 +11,14 @@ import { ECONOMY } from '../config';
 import { getFish } from '../data/fish';
 import { getClothing } from '../data/clothing';
 import {
+  DAILY_FISH_LIMIT,
   TOOL_LEVELS,
   fishPrice,
   getShopEntry,
   type BuyerProfile,
   type ShopEntry,
 } from '../data/shop';
+import type { NpcId } from './TrustSystem';
 
 export type ToolId = 'axe' | 'pickaxe' | 'rod';
 
@@ -87,21 +89,42 @@ export class MarketSystem {
     buyer: BuyerProfile,
   ): SellResult {
     const have = inventory.count(fishId);
-    const amount = Math.min(have, Math.max(0, qty));
+    const left = this.fishLeftToday(buyer.npc);
+    const amount = Math.min(have, Math.max(0, qty), left);
     if (amount <= 0) return { ok: false, qty: 0, coins: 0 };
 
     const price = this.priceOf(fishId, buyer);
     inventory.remove(fishId, amount);
+    this.soldToday[buyer.npc] = (this.soldToday[buyer.npc] ?? 0) + amount;
     const coins = price * amount;
     this.addCoins(coins);
     return { ok: true, qty: amount, coins };
+  }
+
+  /**
+   * The day the market last reset. Villagers only take so many fish a day,
+   * so a big haul has to wait for tomorrow.
+   */
+  private day = 1;
+  private soldToday: Record<string, number> = {};
+
+  /** Tells the market which day it is, so the counters can reset. */
+  setDay(day: number): void {
+    if (day === this.day) return;
+    this.day = day;
+    this.soldToday = {};
+  }
+
+  /** How many more fish this villager will buy today. */
+  fishLeftToday(npc: NpcId): number {
+    return Math.max(0, DAILY_FISH_LIMIT - (this.soldToday[npc] ?? 0));
   }
 
   // --- Buying -------------------------------------------------------------
 
   /** True when the player can afford the entry. */
   canBuy(entry: ShopEntry, inventory: Inventory): boolean {
-    if (this.bought.has(entry.id)) return false;
+    if (this.bought.has(entry.id) && !entry.repeatable) return false;
     if (this._coins < entry.cost) return false;
     const materials = entry.materials ?? [];
     return materials.every((material) => inventory.has(material.item, material.qty));
@@ -113,7 +136,9 @@ export class MarketSystem {
    *          raise the tool level, reveal the hint, ...).
    */
   buy(entry: ShopEntry, inventory: Inventory): BuyResult {
-    if (this.bought.has(entry.id)) return { ok: false, spent: 0, reason: 'already-owned' };
+    if (this.bought.has(entry.id) && !entry.repeatable) {
+      return { ok: false, spent: 0, reason: 'already-owned' };
+    }
     if (this._coins < entry.cost) return { ok: false, spent: 0, reason: 'too-expensive' };
 
     const materials = entry.materials ?? [];
@@ -125,7 +150,7 @@ export class MarketSystem {
       inventory.remove(material.item, material.qty);
     }
     this.spend(entry.cost);
-    this.bought.add(entry.id);
+    if (!entry.repeatable) this.bought.add(entry.id);
     return { ok: true, spent: entry.cost };
   }
 
@@ -149,9 +174,16 @@ export class MarketSystem {
     return definition?.bonus ?? 0;
   }
 
-  /** Raises a tool to a level and gives it a fresh set of uses. */
+  /**
+   * Raises a tool to a level and gives it a fresh set of uses.
+   *
+   * A tool that is already better than the one you are given keeps its wear —
+   * otherwise handing in a quest that rewards a level 1 axe would quietly
+   * repair a level 3 one for free.
+   */
   upgradeTool(tool: ToolId, level: number): void {
-    this.toolLevels[tool] = Math.max(this.toolLevels[tool], level);
+    if (level <= this.toolLevels[tool]) return;
+    this.toolLevels[tool] = level;
     this.toolWear[tool] = this.toolDurability(tool);
   }
 
@@ -182,6 +214,22 @@ export class MarketSystem {
     this.toolLevels[tool] = 0;
     this.toolWear[tool] = 0;
     return false;
+  }
+
+  /**
+   * The stamina one swing costs.
+   * @param bareCost what the swing costs with bare hands.
+   */
+  toolSwingCost(tool: ToolId, bareCost: number): number {
+    const level = this.toolLevels[tool];
+    if (level <= 0) return bareCost;
+    return TOOL_LEVELS[tool][level - 1]?.staminaCost ?? bareCost;
+  }
+
+  /** Wears a tool back to full. */
+  repairTool(tool: ToolId): void {
+    if (this.toolLevels[tool] <= 0) return;
+    this.toolWear[tool] = this.toolDurability(tool);
   }
 
   /** Coins you get back for selling the tool. */

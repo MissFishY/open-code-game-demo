@@ -672,6 +672,12 @@ body {
   color: var(--accent);
 }
 
+/* A shop entry whose text has not been bought yet. */
+.recipe__desc--secret {
+  color: var(--muted);
+  font-style: italic;
+}
+
 .panel-box__section {
   margin: 14px 0 0;
   font-size: 11px;
@@ -836,6 +842,12 @@ body {
   transform: translateX(-50%);
   width: min(320px, 42vw);
   display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stamina__row {
+  display: flex;
   align-items: center;
   gap: 10px;
 }
@@ -847,6 +859,19 @@ body {
   background: rgba(0, 0, 0, 0.45);
   border: 1px solid var(--panel-border);
   overflow: hidden;
+}
+
+/* The second bar is the stomach — a little thinner so the two read apart. */
+.stamina__bar--food {
+  height: 7px;
+}
+
+.stamina__fill--food {
+  background: linear-gradient(90deg, #e0a44a, #f2d16b);
+}
+
+.stamina__fill--food.is-low {
+  background: linear-gradient(90deg, #d9705f, #e0a44a);
 }
 
 .stamina__fill {
@@ -865,6 +890,51 @@ body {
   color: var(--muted);
   white-space: nowrap;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+.stamina__label.is-low {
+  color: #f0a05a;
+}
+
+/* The list of places you can decorate. */
+.decor-slot__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.recipe--empty .recipe__name {
+  color: var(--muted);
+}
+
+/* The little wear bar next to a tool. */
+.tool-bar {
+  display: block;
+  width: 64px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--panel-border);
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+
+.tool-bar__fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #7bd88f, #b7e36b);
+}
+
+.tool-bar__fill.is-low {
+  background: linear-gradient(90deg, #f2777a, #f0a05a);
+}
+
+/* The "eat" button next to food in the backpack. */
+.inventory__eat {
+  padding: 3px 10px;
+  font-size: 12px;
+  border-radius: 7px;
 }
 
 /* ---------- Fishing bar ---------- */

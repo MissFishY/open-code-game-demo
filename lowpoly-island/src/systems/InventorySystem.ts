@@ -52,6 +52,17 @@ export class Inventory {
     return sum;
   }
 
+  /**
+   * True when at least one kind of item has reached the stack limit — you
+   * cannot pick up any more of that.
+   */
+  get hasFullStack(): boolean {
+    for (const count of this.items.values()) {
+      if (count >= this.maxStack) return true;
+    }
+    return false;
+  }
+
   /** Number of distinct item types carried. */
   get slotsUsed(): number {
     let slots = 0;

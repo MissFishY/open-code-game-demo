@@ -16,9 +16,11 @@ import { DecorationSystem } from './DecorationSystem';
 import { FishingSystem } from './FishingSystem';
 import { InteriorSystem } from './InteriorSystem';
 import { MarketSystem } from './MarketSystem';
-import { StaminaSystem, STAMINA } from './StaminaSystem';
+import { StaminaSystem, STAMINA, staminaCeiling } from './StaminaSystem';
+import { SatietySystem, SATIETY, type SatietyState } from './SatietySystem';
+import { StorageSystem } from './StorageSystem';
 import { TimeSystem, PHASE_LABELS, WEATHER_LABELS, type DayPhase, type Weather } from './TimeSystem';
-import { TrustSystem, type NpcId } from './TrustSystem';
+import { TrustSystem, TRUST_MAX, type NpcId } from './TrustSystem';
 import { WardrobeSystem } from './WardrobeSystem';
 import {
   QuestSystem,
@@ -32,10 +34,22 @@ import {
   findInteractionTarget,
   type Interactable,
 } from './InteractionSystem';
-import { GameUI } from '../ui/GameUI';
+import { GameUI, type ToolCard } from '../ui/GameUI';
+import { audio, type MusicMood } from '../audio/AudioSystem';
 import { getItem } from '../data/items';
 import { FISH, getFish } from '../data/fish';
-import { BUYERS, shopFor, getShopEntry, TOOL_LEVELS } from '../data/shop';
+import { HINTS } from '../data/dialogue';
+import {
+  BUYERS,
+  shopFor,
+  getShopEntry,
+  isToolId,
+  TOOL_LEVELS,
+  shellPrice,
+  SURPLUS_PRICES,
+  trustDiscount,
+  trustRewardFor,
+} from '../data/shop';
 import {
   EXPANSIONS,
   getExpansion,
@@ -45,6 +59,8 @@ import {
 } from '../data/interior';
 import {
   DECORATIONS,
+  DECORATION_SLOTS,
+  SLOT_ICONS,
   getDecoration,
   getSlot,
   MAX_COZINESS,
@@ -62,6 +78,9 @@ import {
 import type { ResourceNode } from '../world/ResourceField';
 import { heightAt } from '../world/terrain';
 
+/** What it costs to be fished out of the lake by Nell. */
+const RESCUE_FEE = 10;
+
 const DIALOGUE_KEYS = ['Digit1', 'Digit2', 'Digit3', 'Digit4'];
 
 export class Game {
@@ -77,10 +96,30 @@ export class Game {
   private readonly fishing = new FishingSystem(WORLD.seed + 31);
   private readonly interior = new InteriorSystem();
   private readonly market = new MarketSystem();
+  /** The sound system — exposed so the state can be inspected. */
+  readonly audioSystem = audio;
+  /** The chest at home. */
+  private readonly storage = new StorageSystem();
   private readonly wardrobe = new WardrobeSystem();
   private readonly trust = new TrustSystem();
   private readonly time = new TimeSystem();
   private readonly stamina = new StaminaSystem();
+  /** How well fed the traveller is. */
+  private readonly satiety = new SatietySystem();
+  /** Nights spent awake in a row. Each one lowers the stamina ceiling. */
+  private sleepDebt = 0;
+  /** The last hunger state, so the change can be spotted. */
+  private lastHungerState: SatietyState = 'full';
+  /** Whether the player has been warned about sleeping in the daytime. */
+  private restWarned = false;
+  /** How long the traveller has been in the water with nothing left. */
+  private drowningTimer = 0;
+  /** Whether the "you are running out of strength" warning has been shown. */
+  private exhaustedWarned = false;
+  /** The lines of the rescue scene, shown one at a time. */
+  private rescueLines: string[] = [];
+  /** Which line of the rescue scene is showing. */
+  private rescueIndex = 0;
   private readonly quests = new QuestSystem();
   private readonly saveSystem: SaveSystem;
   private readonly ui: GameUI;
@@ -205,9 +244,24 @@ export class Game {
     this.ui.onRest = () => this.restAt();
     this.ui.onOpenInventory = () => {
       this.ui.closePanel();
-      this.ui.openInventory(this.inventory.entries());
+      this.refreshInventory();
     };
     this.ui.onSellTool = (toolId) => this.sellTool(toolId);
+    this.ui.onToggleSound = () => {
+      audio.ensureStarted();
+      this.ui.setSoundIcon(audio.toggleMute());
+    };
+    // Every button makes a small click.
+    document.addEventListener('click', (event) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest('button')) audio.play('click');
+    });
+    this.ui.onSellShell = (itemId) => this.sellShell(itemId);
+    this.ui.onSellSurplus = (itemId) => this.sellSurplus(itemId);
+    this.ui.onOpenStorage = () => this.openStorage();
+    this.ui.onStore = (itemId) => this.storeItem(itemId);
+    this.ui.onTake = (itemId) => this.takeItem(itemId);
+    this.ui.onEat = (itemId) => this.eat(itemId);
     this.ui.onOpenPanel = (panel) => this.openPanelByName(panel);
     this.ui.onPanelClosed = () => {
       this.fishing.cancel();
@@ -246,6 +300,8 @@ export class Game {
   }
 
   private beginPlay(): void {
+    // The browser only lets us start audio after a click.
+    audio.ensureStarted();
     this.ui.hideTitle();
     this.input.setEnabled(true);
     this.input.requestLock();
@@ -316,7 +372,7 @@ export class Game {
       if (this.ui.isPanelOpen) {
         this.closePanel();
       } else {
-        this.ui.openInventory(this.inventory.entries());
+        this.refreshInventory();
         this.input.setEnabled(false);
         this.input.exitLock();
         this.input.clearActions();
@@ -395,24 +451,54 @@ export class Game {
           // A new day: the villagers can greet you again.
           this.usedLines.clear();
           this.lastTalkDay.clear();
+          // You were awake the whole night — that costs you the morning.
+          this.sleepDebt += 1;
+          this.recomputeStaminaMax();
+          this.ui.toast(
+            `熬了一整夜，体力上限少了 ${STAMINA.sleepPenalty} 点。回小屋睡一觉才补得回来。`,
+            'bad',
+            4200,
+          );
         }
         this.ui.toast(`第 ${this.time.day} 天 · ${this.time.phaseLabel} · ${this.time.weatherLabel}`, 'info', 2600);
+        audio.play('phase');
       }
 
       // Swimming: the water is too deep to wade but the swimsuit works.
       this.swimming = this.player.swimming;
       if (this.swimming) {
-        const rainPenalty = this.time.weather === 'rain' ? 1.6 : 1;
-        this.stamina.drain(STAMINA.swimDrain * rainPenalty * dt);
+        // The clothes really do matter here: the swimming clothes make the
+        // water cheaper, and the diving ones make the deep cheaper still.
+        const bonus = this.wardrobe.bonuses();
+        const underwater = this.player.isUnderwater;
+        const base = underwater ? STAMINA.diveDrain : STAMINA.swimDrain;
+        const reduce = underwater ? (bonus.diveDrain ?? 0) : (bonus.swimDrain ?? 0);
+        const factor = Math.max(0.2, 1 - reduce / 100);
+        const rainPenalty =
+          this.time.weather === 'rain' && bonus.rainImmune !== true ? 1.6 : 1;
+        this.stamina.drain(base * factor * rainPenalty * dt);
         if (this.stamina.isExhausted) {
-          this.ui.toast('你快没力气了，得回岸上！', 'bad', 2600);
+          if (!this.exhaustedWarned) {
+            this.exhaustedWarned = true;
+            this.ui.toast('你快没力气了，得回岸上！', 'bad', 2600);
+          }
+          // Nobody lets you drown on this island.
+          this.drowningTimer += dt;
+          if (this.drowningTimer >= STAMINA.drownLimit) {
+            this.triggerRescue();
+          }
+        } else {
+          this.exhaustedWarned = false;
+          this.drowningTimer = 0;
         }
       }
     }
 
     // --- Fishing ----------------------------------------------------------
     if (this.fishing.isActive) {
+      const wasWaiting = this.fishing.stage === 'waiting';
       this.fishing.update(dt);
+      if (wasWaiting && this.fishing.stage === 'bite') audio.play('bite');
       this.ui.showFishing({
       status: this.fishing.lastResult,
       hint: this.fishing.hint,
@@ -425,19 +511,54 @@ export class Game {
       if (this.input.consume('interact')) this.reelIn();
     }
 
-    // --- Stamina ----------------------------------------------------------
-    if (interactive) {
+    // --- Stamina and satiety ----------------------------------------------
+    {
+      const hunger = this.satiety.effect;
       const sprinting =
+        interactive &&
+        hunger.canSprint &&
         (this.input.isDown('ShiftLeft') || this.input.isDown('ShiftRight')) &&
         this.player.isMoving &&
         this.stamina.canSprint &&
         !this.swimming;
+
       if (sprinting) {
         this.stamina.drain(STAMINA.sprintDrain * dt);
-      } else if (!this.swimming) {
+      } else if (!this.swimming && (interactive || this.fishing.isActive)) {
+        // Sitting on the bank with a rod counts as resting too.
         const bonus = this.wardrobe.bonuses();
-        this.stamina.regen(dt, this.player.isMoving);
-        if (bonus.staminaRegen) this.stamina.restore(bonus.staminaRegen * dt);
+        const moving = interactive && this.player.isMoving;
+        this.stamina.regen(dt, moving, hunger.regen);
+        if (bonus.staminaRegen) {
+          this.stamina.restore(bonus.staminaRegen * dt * hunger.regen);
+        }
+      }
+
+      // The market forgets yesterday's sales when a new day starts.
+      this.market.setDay(this.time.day);
+
+      // Hunger keeps running down even while a panel is open — time passes.
+      if (!titleVisible) {
+        this.satiety.update(dt, { sprinting, swimming: this.swimming });
+      }
+
+      // Hunger makes you slower, and a weak traveller cannot work at all.
+      this.player.speedScale = hunger.speed;
+
+      const state = this.satiety.state;
+      if (state !== this.lastHungerState) {
+        const previous = this.lastHungerState;
+        this.lastHungerState = state;
+        this.recomputeStaminaMax();
+        if (state === 'weak') {
+          this.ui.toast('饿得站不住了。先找点吃的吧 —— 背包里的，或者野外的浆果。', 'bad', 4200);
+        } else if (previous === 'weak') {
+          this.ui.toast('吃了点东西，好些了。', 'good', 3200);
+        } else if (state === 'hungry') {
+          this.ui.toast('肚子很空了，腿有点发软。', 'bad', 3400);
+        } else if (state === 'peckish') {
+          this.ui.toast('肚子有点空了。背包里有吃的吗？', 'info', 3000);
+        }
       }
     }
 
@@ -454,9 +575,20 @@ export class Game {
     );
 
     // Hide the roof while the player is inside the hut.
+    const inHut =
+      this.world.isHutBuilt &&
+      this.world.isInsideHut(this.player.position.x, this.player.position.z);
     if (this.world.isHutBuilt) {
-      this.world.setRoofVisible(!this.world.isInsideHut(this.player.position.x, this.player.position.z));
+      this.world.setRoofVisible(!inHut);
     }
+
+    // The music follows the time of day and whether you are indoors.
+    const mood: MusicMood = inHut
+      ? 'indoor'
+      : this.time.phase === 'night' || this.time.phase === 'evening'
+        ? 'night'
+        : 'day';
+    audio.setMood(mood);
 
 
     if (!titleVisible) {
@@ -642,6 +774,33 @@ export class Game {
     }
   }
 
+  /**
+   * The stamina one swing at this node costs.
+   *
+   * Bare hands are expensive; a tool turns the same breath into much more
+   * material. That is what makes a tool worth its materials.
+   */
+  /**
+   * True when the traveller is too weak to work. You can still walk around
+   * and pick berries — you just cannot cut, mine or fish.
+   */
+  private get tooWeakToWork(): boolean {
+    return !this.satiety.effect.canWork;
+  }
+
+  private harvestCost(kind: string): number {
+    if (kind === 'wood') {
+      return this.market.toolSwingCost('axe', STAMINA.chopCost);
+    }
+    if (kind === 'stone') {
+      return this.market.toolSwingCost('pickaxe', STAMINA.mineCost);
+    }
+    if (kind === 'deepshell') {
+      return STAMINA.shellCost;
+    }
+    return STAMINA.forageCost;
+  }
+
   private harvest(node: ResourceNode): void {
     if (node.amount <= 0) {
       this.ui.toast('这里已经采完了。', 'bad');
@@ -654,14 +813,27 @@ export class Game {
       return;
     }
 
-    // Diving for a shell costs a good deal of breath.
-    if (node.kind === 'deepshell') {
-      if (this.stamina.current < 12) {
-        this.ui.toast('你没有力气潜下去了。', 'bad');
-        return;
-      }
-      this.stamina.drain(12);
+    // Every swing costs breath — this is what makes the stamina bar matter.
+    // A tool makes the swing both cheaper and more productive.
+    const cost = this.harvestCost(node.kind);
+    if (this.tooWeakToWork) {
+      this.ui.toast('饿得没力气干活了。先吃点东西。', 'bad');
+      audio.play('deny');
+      return;
     }
+    if (this.stamina.current < cost) {
+      this.ui.toast(
+        node.kind === 'deepshell' ? '你没有力气潜下去了。' : '你没力气了，先歇一会儿。',
+        'bad',
+      );
+      audio.play('deny');
+      return;
+    }
+    this.stamina.drain(cost);
+    this.satiety.drain(SATIETY.workDrain);
+    audio.play(
+      node.kind === 'wood' ? 'chop' : node.kind === 'stone' ? 'mine' : 'pickup',
+    );
 
     const result = this.world.resources.harvest(node);
     if (!result) return;
@@ -723,16 +895,22 @@ export class Game {
   /** Opens the panel for the player's own hut. */
   private openHome(): void {
     const blueprint = this.building.getBlueprint('hut');
-    const tools = ['axe', 'pickaxe']
-      .filter((id) => this.inventory.has(id))
-      .map((id) => getItem(id).name)
+    // The tools live on your belt, not in the backpack.
+    const tools = this.toolCards()
+      .map((tool) => `${tool.name}（还能用 ${tool.remaining} 次）`)
       .join('、');
+
+    const rest = this.time.phase === 'night'
+      ? '夜里睡觉会跳到明天清晨。'
+      : '现在睡觉会跳过整个白天。';
 
     this.ui.showHome(
       blueprint?.completeText ?? '属于你自己的地方。',
-      tools
-        ? `你带着：${tools}。在火炉边也可以制作东西。`
-        : '在火炉边也可以制作东西。回家会保存进度。',
+      [
+        tools ? `你带着：${tools}。` : '你还没有工具。',
+        '在火炉边也可以制作东西。回家会保存进度。',
+        rest,
+      ].join(''),
     );
     this.input.setEnabled(false);
     this.input.exitLock();
@@ -761,24 +939,35 @@ export class Game {
     const recipe = this.crafting.getRecipe(recipeId);
     if (!recipe) return;
 
-    const result = this.crafting.craft(recipe, this.inventory);
+    // One axe at a time. Otherwise a second one would be a free repair.
+    const ownedTool =
+      isToolId(recipe.output.item) && this.market.toolLevel(recipe.output.item) > 0;
+
+    const result = this.crafting.craft(recipe, this.inventory, ownedTool);
     if (!result.ok) {
       this.ui.toast(
-        result.reason === 'inventory-full' ? '你的背包放不下了。' : '材料还不够。',
+        result.reason === 'inventory-full'
+          ? '你的背包放不下了。'
+          : result.reason === 'already-owned'
+            ? `你已经有一把${getItem(recipe.output.item).name}了。`
+            : '材料还不够。',
         'bad',
       );
       return;
     }
 
     const made = result.produced[0];
-    // Crafting a tool is how you get your first one.
+    // Crafting a tool is how you get your first one. A tool is not carried in
+    // the backpack — it hangs on your belt, where its wear is visible.
     if (made && (made.item === 'axe' || made.item === 'pickaxe' || made.item === 'rod')) {
+      this.inventory.remove(made.item);
       this.market.upgradeTool(made.item, 1);
     }
     this.ui.toast(
       `制作了 ${made ? getItem(made.item).name : ''}${made ? ` ×${made.qty}` : ''}`,
       'good',
     );
+    audio.play('craft');
     this.refreshCraftingPanel();
     this.updateStats();
     this.save();
@@ -813,7 +1002,7 @@ export class Game {
         this.openSaves();
         break;
       case 'inventory':
-        this.ui.openInventory(this.inventory.entries());
+        this.refreshInventory();
         this.input.setEnabled(false);
         this.input.exitLock();
         this.input.clearActions();
@@ -880,32 +1069,51 @@ export class Game {
       return;
     }
 
-    const placed = this.decorations.list().map((placement) => {
-      const decoration = getDecoration(placement.type);
-      const slot = getSlot(placement.slot);
+    const owned = DECORATIONS.map((decoration) => {
+      const count = this.inventory.count(decoration.itemId);
+      const target = count > 0 ? this.decorations.findSlotFor(decoration.id) : null;
       return {
-        slot: placement.slot,
-        slotLabel: slot?.label ?? '',
-        name: decoration?.name ?? placement.type,
-        icon: decoration?.icon ?? '❔',
+        type: decoration.id,
+        name: decoration.name,
+        icon: decoration.icon,
+        count,
+        description: decoration.description,
+        targetSlot: target ? getSlot(target)?.label : undefined,
+      };
+    }).filter((entry) => entry.count > 0);
+
+    // Every place you can decorate, so it is obvious where things go.
+    const slots = DECORATION_SLOTS.map((slot) => {
+      const placement = this.decorations.get(slot.id);
+      const decoration = placement ? getDecoration(placement.type) : undefined;
+      const fits = DECORATIONS.filter(
+        (def) =>
+          slot.accepts.includes(def.id) && this.inventory.count(def.itemId) > 0,
+      ).map((def) => ({
+        type: def.id,
+        name: def.name,
+        icon: def.icon,
+        count: this.inventory.count(def.itemId),
+      }));
+      return {
+        id: slot.id,
+        label: slot.label,
+        icon: SLOT_ICONS[slot.kind] ?? '📍',
+        occupied: decoration
+          ? { name: decoration.name, icon: decoration.icon }
+          : undefined,
+        fits,
       };
     });
-
-    const owned = DECORATIONS.map((decoration) => ({
-      type: decoration.id,
-      name: decoration.name,
-      icon: decoration.icon,
-      count: this.inventory.count(decoration.itemId),
-      description: decoration.description,
-    })).filter((entry) => entry.count > 0);
 
     this.ui.showDecor({
       coziness: this.decorations.coziness,
       maxCoziness: MAX_COZINESS,
       tierTitle: this.decorations.title,
-      placed,
       owned,
-      onPlace: (type) => this.placeDecoration(type),
+      slots,
+      onPlace: (type) => this.placeDecorationAnywhere(type),
+      onPlaceIn: (slot, type) => this.placeDecoration(slot, type),
       onRemove: (slot) => this.takeDecorationBack(slot),
     });
 
@@ -915,20 +1123,29 @@ export class Game {
   }
 
   /** Puts a decoration into the first free slot that fits it. */
-  private placeDecoration(type: string): void {
+  private placeDecorationAnywhere(type: string): void {
     const slot = this.decorations.findSlotFor(type);
     if (!slot) {
       this.ui.toast('没有放得下的位置了。', 'bad');
       return;
     }
+    this.placeDecoration(slot, type);
+  }
+
+  /** Puts a decoration into a chosen slot. */
+  private placeDecoration(slot: string, type: string): void {
     if (!this.decorations.place(slot, type, this.inventory)) {
-      this.ui.toast('背包里没有这件装饰。', 'bad');
+      this.ui.toast('这里放不下，或者背包里没有这件装饰。', 'bad');
       return;
     }
 
     this.world.placeDecoration(slot, type);
     const decoration = getDecoration(type);
-    this.ui.toast(`放好了 ${decoration?.name ?? ''}。`, 'good');
+    this.ui.toast(
+      `把${decoration?.name ?? ''}放在了${getSlot(slot)?.label ?? ''}。`,
+      'good',
+    );
+    audio.play('place');
     this.claimCozinessTiers();
     this.refreshDecorPanel();
     this.updateStats();
@@ -1007,7 +1224,8 @@ export class Game {
       phase: this.time.phase,
       weather: this.time.weather,
       tired: this.stamina.ratio < 0.25,
-      full: this.inventory.total >= 18,
+      // Only when the backpack really cannot take another of something.
+      full: this.inventory.hasFullStack,
       hutBuilt: this.building.isBuilt('hut'),
       expansions: this.interior.expandedIds as ExpansionId[],
       hasItem: this.inventory.entries().map((entry) => entry.id),
@@ -1089,6 +1307,12 @@ export class Game {
   }
 
   private handleDialogueChoice(choice: DialogueChoice): void {
+    // The rescue scene runs on its own little script.
+    if (this.rescueLines.length > 0) {
+      this.advanceRescueScene();
+      return;
+    }
+
     const npc = this.dialogueNpc;
     const questId = this.dialogueQuest;
 
@@ -1102,11 +1326,16 @@ export class Game {
             .map((reward) => `${reward.qty}× ${getItem(reward.item).name}`)
             .join(', ');
           this.ui.toast(`任务完成：${def.title}`, 'quest', 4600);
+          audio.play('quest');
           if (rewards) this.ui.toast(`获得 ${rewards}`, 'good');
           if (result.dropped.length > 0) {
             this.ui.toast('有些奖励放不进背包了。', 'bad');
           }
           this.flags[`done:${questId}`] = true;
+          // A tool reward is a real tool, not a token in the backpack.
+          for (const reward of result.granted) {
+            if (isToolId(reward.item)) this.market.upgradeTool(reward.item, 1);
+          }
           this.updateStats();
           this.updateObjective();
           this.save();
@@ -1260,7 +1489,9 @@ export class Game {
       market: this.market.toJSON(),
       trust: this.trust.toJSON(),
       time: this.time.toJSON(),
-      stamina: this.stamina.toJSON(),
+      stamina: { ...this.stamina.toJSON(), debt: this.sleepDebt },
+      satiety: this.satiety.toJSON(),
+      storage: this.storage.toJSON(),
       flags: { ...this.flags },
       playTime: this.playTime,
       seenIntro: true,
@@ -1283,6 +1514,11 @@ export class Game {
     this.trust.load(data.trust);
     this.time.load(data.time);
     this.stamina.load(data.stamina);
+    this.satiety.load(data.satiety);
+    this.storage.load(data.storage);
+    const debt = (data.stamina as { debt?: unknown } | undefined)?.debt;
+    this.sleepDebt = typeof debt === 'number' && Number.isFinite(debt) ? Math.max(0, Math.min(6, Math.floor(debt))) : 0;
+    this.recomputeStaminaMax();
     this.applyBonuses();
     this.flags = { ...data.flags };
     this.playTime = data.playTime;
@@ -1359,9 +1595,24 @@ export class Game {
 
   // ------------------------------------------------------------------ rest
 
-  /** Rests: restores the stamina, rolls the night over and saves. */
+  /**
+   * Rests: restores the stamina and clears the sleep debt — nothing else.
+   *
+   * Turning in does not fill the stomach. Sleep is rest, not food: to walk
+   * out of the hut in the morning with a working body you still have to eat
+   * something first.
+   */
   private restAt(): void {
+    // Sleeping during the day throws the whole day away — make sure.
+    if (this.time.phase !== 'night' && !this.restWarned) {
+      this.restWarned = true;
+      this.ui.toast('现在睡下会跳过整个白天。再点一次确认。', 'bad', 4200);
+      return;
+    }
+    this.restWarned = false;
     this.stamina.refill();
+    this.sleepDebt = 0;
+    this.recomputeStaminaMax();
     this.time.rest();
     this.applyLighting();
     // A new day means the villagers can say their greeting again.
@@ -1374,6 +1625,11 @@ export class Game {
       'good',
       3600,
     );
+    // Waking up hungry is normal now, but say it once so it does not read as
+    // a bug — the bar sits there empty and the player has to eat first.
+    if (this.satiety.isHungry) {
+      this.ui.toast('醒来肚子是空的。先吃点东西，再下地干活。', 'info', 4200);
+    }
     this.updateStatus();
   }
 
@@ -1385,6 +1641,216 @@ export class Game {
     this.updateStats();
   }
 
+  // ---------------------------------------------------------------- storage
+
+  /** Opens the chest at home. */
+  private openStorage(): void {
+    const describe = (id: string, count: number) => ({
+      id,
+      name: getItem(id).name,
+      icon: getItem(id).icon,
+      count,
+    });
+
+    this.ui.showStorage({
+      bag: this.inventory.entries().map((entry) => describe(entry.id, entry.count)),
+      chest: this.storage.entries().map((entry) => describe(entry.id, entry.count)),
+      usedSlots: this.storage.slotsUsed,
+      maxSlots: this.storage.maxSlots,
+      onStore: (id) => this.storeItem(id),
+      onTake: (id) => this.takeItem(id),
+    });
+    this.input.setEnabled(false);
+    this.input.exitLock();
+    this.input.clearActions();
+  }
+
+  /** Puts one of your things into the chest. */
+  private storeItem(itemId: string): void {
+    if (!this.inventory.has(itemId)) return;
+    if (!this.storage.canAccept(itemId, 1)) {
+      this.ui.toast('箱子放不下了。', 'bad');
+      return;
+    }
+    const taken = this.storage.add(itemId, 1);
+    if (taken <= 0) {
+      this.ui.toast('箱子放不下了。', 'bad');
+      return;
+    }
+    this.inventory.remove(itemId, taken);
+    audio.play('place');
+    this.openStorage();
+    this.updateStats();
+    this.save();
+  }
+
+  /** Takes one of your things back out of the chest. */
+  private takeItem(itemId: string): void {
+    if (!this.storage.has(itemId)) return;
+    if (this.inventory.count(itemId) >= this.inventory.maxStack) {
+      this.ui.toast('背包里放不下了。', 'bad');
+      return;
+    }
+    const taken = this.storage.remove(itemId, 1);
+    if (taken <= 0) return;
+    this.inventory.add(itemId, taken);
+    audio.play('pickup');
+    this.openStorage();
+    this.updateStats();
+    this.save();
+  }
+
+  /** Sells something you made more of than you need. */
+  private sellSurplus(itemId: string): void {
+    const price = SURPLUS_PRICES[itemId];
+    if (!price || !this.inventory.has(itemId)) return;
+    this.inventory.remove(itemId);
+    this.market.addCoins(price);
+    this.ui.toast(`卖掉了 1 个${getItem(itemId).name}，得到 ${price} 币。`, 'good');
+    audio.play('coin');
+    this.refreshShop();
+    this.updateStats();
+    this.save();
+  }
+
+  /** Sells a shell to the villager you are standing at. */
+  private sellShell(itemId: string): void {
+    if (itemId !== 'shell' && itemId !== 'deepshell') return;
+    const npcId = this.activeShopNpc;
+    if (!npcId) return;
+    if (!this.inventory.has(itemId)) return;
+
+    // Maren still needs a deep shell for her quest, so the last one stays.
+    if (
+      itemId === 'deepshell' &&
+      this.inventory.count(itemId) <= 1 &&
+      !this.flags['done:sister']
+    ) {
+      this.ui.toast('这个深海螺得留着 —— Maren 还要一个。', 'bad');
+      return;
+    }
+
+    const price = shellPrice(itemId, BUYERS[npcId]);
+    this.inventory.remove(itemId);
+    this.market.addCoins(price);
+    this.ui.toast(`卖掉了 1 个${getItem(itemId).name}，得到 ${price} 币。`, 'good');
+    audio.play('coin');
+    this.refreshShop();
+    this.updateStats();
+    this.save();
+  }
+
+  /**
+   * Nell fishes the traveller out of the water.
+   *
+   * Running out of strength under water is not a game over: you wake up the
+   * next morning in the village, and you owe her for the trouble.
+   */
+  private triggerRescue(): void {
+    this.drowningTimer = 0;
+    this.exhaustedWarned = false;
+    this.swimming = false;
+
+    // You wake up the next morning, in the village, with a full bar —
+    // Nell saved you and fed you while you were out.
+    this.time.rest();
+    this.applyLighting();
+    this.stamina.refill();
+    this.satiety.refill();
+    this.recomputeStaminaMax();
+    this.usedLines.clear();
+    this.lastTalkDay.clear();
+
+    const spawn = WORLD_LAYOUT.spawn;
+    this.player.setPosition(spawn.x, heightAt(spawn.x, spawn.z), spawn.z);
+
+    // The rescue fee.
+    const paid = Math.min(RESCUE_FEE, this.market.coins);
+    this.market.spend(paid);
+
+    const nell = getNpc('nell');
+    this.rescueLines = [
+      '……你醒了。',
+      '你抱着那块贝壳就往下沉。我正好在岸边收网，看见了。',
+      '把你拖上来的时候，你已经没有呼吸了。我拍了你好一会儿。',
+      paid >= RESCUE_FEE
+        ? `十块钱。这不是敲诈 —— 我得给你买药。`
+        : `你身上只有 ${paid} 块钱。剩下的，先记你账上。`,
+      '……行了。你欠我一条命，别再一个人往深水里钻了。',
+    ];
+    this.rescueIndex = 0;
+    this.showRescueLine(nell);
+    this.updateStats();
+    this.updateStatus();
+    this.save();
+  }
+
+  /** Shows one line of the rescue scene. */
+  private showRescueLine(nell: NpcDef | undefined): void {
+    const text = this.rescueLines[this.rescueIndex];
+    if (text === undefined) {
+      this.endRescueScene();
+      return;
+    }
+    const node: DialogueNode = {
+      id: 'rescue',
+      speaker: nell?.name ?? 'Nell',
+      role: nell?.role ?? '采集者',
+      text,
+      choices: [{ label: '继续', action: 'close' }],
+      isResolution: false,
+      usedLines: [],
+    };
+    this.currentDialogue = node;
+    this.ui.showDialogue(node);
+    this.input.setEnabled(false);
+    this.input.exitLock();
+    this.input.clearActions();
+  }
+
+  /** Moves the rescue scene on, or ends it. */
+  private advanceRescueScene(): void {
+    this.rescueIndex += 1;
+    if (this.rescueIndex >= this.rescueLines.length) {
+      this.endRescueScene();
+      return;
+    }
+    this.showRescueLine(getNpc('nell'));
+  }
+
+  private endRescueScene(): void {
+    this.rescueLines = [];
+    this.rescueIndex = 0;
+    this.ui.hideDialogue();
+    this.ui.toast('你在村口的草地上醒过来，身上还是湿的。', 'info', 4200);
+    this.updateStats();
+    this.updateStatus();
+  }
+
+  /** Re-opens the backpack, with the tool belt on it. */
+  private refreshInventory(): void {
+    this.ui.openInventory(this.inventory.entries(), this.toolCards());
+  }
+
+  /** The tools on the traveller's belt. */
+  private toolCards(): ToolCard[] {
+    return (['axe', 'pickaxe', 'rod'] as const)
+      .filter((tool) => this.market.toolLevel(tool) > 0)
+      .map((tool) => {
+        const level = this.market.toolLevel(tool);
+        const definition = TOOL_LEVELS[tool][level - 1];
+        return {
+          id: tool,
+          name: definition?.label ?? tool,
+          icon: tool === 'axe' ? '🪓' : tool === 'pickaxe' ? '⛏️' : '🎣',
+          level,
+          remaining: this.market.toolRemaining(tool),
+          max: this.market.toolDurability(tool),
+          refund: this.market.toolRefund(tool),
+        };
+      });
+  }
+
   /** Sells a tool for a fraction of what it was worth. */
   private sellTool(toolId: string): void {
     const tool = toolId as 'axe' | 'pickaxe' | 'rod';
@@ -1394,6 +1860,7 @@ export class Game {
       return;
     }
     this.ui.toast(`卖掉了工具，得到 ${refund} 币。`, 'good');
+    audio.play('coin');
     this.refreshShop();
     this.updateStats();
     this.save();
@@ -1475,6 +1942,10 @@ export class Game {
       this.ui.toast('你还没有鱼竿。Tallis 那里可以免费拿一根。', 'bad');
       return;
     }
+    if (this.tooWeakToWork) {
+      this.ui.toast('饿得没力气握竿了。先吃点东西。', 'bad');
+      return;
+    }
     if (this.stamina.current < 3) {
       this.ui.toast('太累了，钓不了鱼。', 'bad');
       return;
@@ -1488,7 +1959,8 @@ export class Game {
       luck: bonus.fishLuck ?? 0,
       rodPower: (bonus.rodPower ?? 0) + this.market.toolLevel('rod') * 0.05,
     });
-    this.stamina.drain(5);
+    this.stamina.drain(this.market.toolSwingCost('rod', STAMINA.fishCost));
+    this.satiety.drain(SATIETY.workDrain * 0.5);
     this.wearTool('rod');
     this.ui.showFishing({
       status: this.fishing.lastResult,
@@ -1511,6 +1983,7 @@ export class Game {
       (bonus.rodPower ?? 0) + this.market.toolLevel('rod') * 0.05,
     );
     if (result.ok && result.fish) {
+      audio.play('catch');
       const taken = this.inventory.add(result.fish.id, 1);
       this.ui.toast(
         taken > 0 ? `钓到了 ${result.fish.name}！` : '背包满了，鱼又跑掉了。',
@@ -1553,12 +2026,51 @@ export class Game {
     const npc = getNpc(npcId);
     if (!npc) return;
     const buyer = BUYERS[npcId];
-    const entries = shopFor(npc.id).map((entry) => ({
-      entry,
-      affordable: this.market.canBuy(entry, this.inventory),
-      owned: this.market.hasBought(entry.id),
-    }));
+    const trustLevel = this.trust.level(npc.id);
+    const entries = shopFor(npc.id).map((entry) => {
+      // People you know well give you a better price.
+      const factor = trustDiscount(npc.id, entry.kind, trustLevel);
+      const cost = Math.max(1, Math.round(entry.cost * factor));
+      return {
+        entry,
+        affordable: this.market.canBuy(entry, this.inventory) && this.market.coins >= cost,
+        owned: this.market.hasBought(entry.id),
+        cost,
+      };
+    });
 
+    // Tallis mends your tools once you know him.
+    const repair = trustRewardFor(npc.id, trustLevel);
+    const wornTool = this.toolCards().find((tool) => tool.remaining < tool.max);
+    if (repair?.kind === 'repair' && wornTool) {
+      entries.push({
+        entry: {
+          id: 'service.repair',
+          name: repair.label,
+          icon: '🛠️',
+          description: repair.description,
+          cost: 0,
+          kind: 'tool',
+          seller: npc.id,
+        },
+        affordable: true,
+        owned: false,
+        cost: 0,
+      });
+    }
+
+    // Things you made more of than you need.
+    const surplus = Object.entries(SURPLUS_PRICES)
+      .map(([id, price]) => ({
+        id,
+        name: getItem(id).name,
+        icon: getItem(id).icon,
+        count: this.inventory.count(id),
+        price,
+      }))
+      .filter((entry) => entry.count > 0);
+
+    const fishLeft = this.market.fishLeftToday(npc.id);
     const fish = FISH.map((definition) => ({
       id: definition.id,
       name: definition.name,
@@ -1566,6 +2078,7 @@ export class Game {
       count: this.inventory.count(definition.id),
       price: this.market.priceOf(definition.id, buyer),
       wanted: buyer.wants === definition.id,
+      left: fishLeft,
     })).filter((entry) => entry.count > 0);
 
     const tools = (['axe', 'pickaxe', 'rod'] as const)
@@ -1582,11 +2095,37 @@ export class Game {
         };
       });
 
+    // Shells the player can sell. Maren still needs one deep shell.
+    const shells = (['shell', 'deepshell'] as const)
+      .map((itemId) => {
+        const count = this.inventory.count(itemId);
+        if (count <= 0) return null;
+        const needed =
+          itemId === 'deepshell' && count <= 1 && !this.flags['done:sister'];
+        return {
+          id: itemId,
+          name: getItem(itemId).name,
+          icon: getItem(itemId).icon,
+          count,
+          price: shellPrice(itemId, buyer),
+          needed,
+        };
+      })
+      .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+
+    const reward = trustRewardFor(npc.id, trustLevel);
     this.ui.showShop({
       sellerName: npc.name,
       coins: this.market.coins,
       entries,
       fish,
+      shells,
+      surplus,
+      trust: {
+        level: trustLevel,
+        max: TRUST_MAX,
+        reward: reward?.label ?? null,
+      },
       wants: buyer.wants ? getFish(buyer.wants)?.name ?? null : null,
       tools,
     });
@@ -1594,8 +2133,19 @@ export class Game {
 
   /** Buys something from the shop. */
   private buyEntry(entryId: string): void {
+    if (entryId === 'service.repair') {
+      this.repairTools();
+      return;
+    }
     const entry = getShopEntry(entryId);
     if (!entry) return;
+    // Food needs a free slot in the backpack.
+    if (entry.kind === 'food' && entry.item) {
+      if (this.inventory.count(entry.item) >= this.inventory.maxStack) {
+        this.ui.toast('背包里已经放不下了。', 'bad');
+        return;
+      }
+    }
     const result = this.market.buy(entry, this.inventory);
     if (!result.ok) {
       this.ui.toast(
@@ -1617,9 +2167,9 @@ export class Game {
     } else if (entry.kind === 'tool' && entry.toolId) {
       this.market.upgradeTool(entry.toolId, entry.level ?? 1);
       this.ui.toast(`${entry.name} 升级完成。`, 'good');
-    } else if (entry.kind === 'food') {
-      this.stamina.refill();
-      this.ui.toast(`吃了${entry.name}，体力恢复了。`, 'good');
+    } else if (entry.kind === 'food' && entry.item) {
+      this.inventory.add(entry.item);
+      this.ui.toast(`买下了${entry.name}，回背包吃。`, 'good');
     } else if (entry.kind === 'hint') {
       this.ui.toast(`${entry.name}：${entry.description}`, 'quest', 7000);
     }
@@ -1629,14 +2179,56 @@ export class Game {
     this.save();
   }
 
-  /** Sells a fish. */
+  /** Eats something out of the backpack. */
+  private eat(itemId: string): void {
+    const item = getItem(itemId);
+    if (!item?.food) return;
+    if (!this.inventory.has(itemId)) return;
+    this.inventory.remove(itemId);
+    this.satiety.restore(item.food.satiety);
+    this.stamina.restore(item.food.stamina);
+    this.recomputeStaminaMax();
+    this.ui.toast(`吃了${item.name}，肚子舒服多了。`, 'good');
+    audio.play('eat');
+    this.refreshInventory();
+    this.updateStats();
+    this.updateStatus();
+    this.save();
+  }
+
+  /** Tallis mends every tool you carry. */
+  private repairTools(): void {
+    let repaired = 0;
+    for (const tool of ['axe', 'pickaxe', 'rod'] as const) {
+      if (this.market.toolLevel(tool) <= 0) continue;
+      if (this.market.toolRemaining(tool) >= this.market.toolDurability(tool)) continue;
+      this.market.repairTool(tool);
+      repaired++;
+    }
+    if (repaired <= 0) {
+      this.ui.toast('你的工具都还好好的。', 'info');
+      return;
+    }
+    this.ui.toast(`Tallis 帮你修好了 ${repaired} 件工具。`, 'good');
+    audio.play('craft');
+    this.refreshShop();
+    this.refreshInventory();
+    this.updateStats();
+    this.save();
+  }
+
+  /** Sells a fish to the villager you are standing at. */
   private sellFish(fishId: string): void {
     const npcId = this.activeShopNpc;
     if (!npcId) return;
     const buyer = BUYERS[npcId];
     const result = this.market.sellFish(fishId, 1, this.inventory, buyer);
-    if (!result.ok) return;
+    if (!result.ok) {
+      this.ui.toast('他今天收够了，明天再来吧。', 'bad');
+      return;
+    }
     this.ui.toast(`卖掉了 1 条鱼，得到 ${result.coins} 币。`, 'good');
+    audio.play('coin');
     this.updateStats();
     this.refreshShop();
     this.save();
@@ -1783,8 +2375,14 @@ export class Game {
       };
     });
 
+    // Hints the player has paid Maren for.
+    const hints = HINTS.filter((hint) => this.market.hasBought(`hint.${hint.id}`)).map(
+      (hint) => ({ title: hint.title, text: hint.text }),
+    );
+
     this.ui.showJournal({
       quests,
+      hints,
       trust: NPCS.map((npc) => ({
         name: npc.name,
         level: this.trust.label(npc.id),
@@ -1797,10 +2395,30 @@ export class Game {
 
   /** Applies the clothing bonuses to the stamina system. */
   private applyBonuses(): void {
-    const bonus = this.wardrobe.bonuses();
-    this.stamina.setMax(STAMINA.baseMax + (bonus.staminaMax ?? 0));
     // Show the clothes on the traveller.
     this.player.avatar.setOutfit(this.wardrobe.list());
+    this.recomputeStaminaMax();
+  }
+
+  /**
+   * Works out how much stamina the traveller can hold.
+   *
+   * The ceiling drops when the stomach is empty and for every night spent
+   * awake, so a sleepless night really does cost you the next morning.
+   */
+  private recomputeStaminaMax(): void {
+    const bonus = this.wardrobe.bonuses();
+    // An empty stomach halves what the body can hold; every sleepless night
+    // then takes a flat bite out of it.
+    const factor = this.satiety.effect.maxFactor;
+    this.stamina.setMax(
+      staminaCeiling(
+        STAMINA.baseMax,
+        bonus.staminaMax ?? 0,
+        this.sleepDebt,
+        factor,
+      ),
+    );
   }
 
   /** Updates the clock, the weather light and the stamina. */
@@ -1811,6 +2429,10 @@ export class Game {
       weather: this.time.weatherLabel,
       stamina: this.stamina.current,
       staminaMax: this.stamina.max,
+      satiety: this.satiety.current,
+      satietyMax: this.satiety.max,
+      sleepDebt: this.sleepDebt,
+      hunger: this.satiety.state,
     });
   }
 

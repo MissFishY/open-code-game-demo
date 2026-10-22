@@ -41,6 +41,12 @@ export class Player {
     this.avatar.setPosition(this.position.x, this.position.y, this.position.z);
   }
 
+  /**
+   * Multiplies the walking speed. Hunger and other conditions slow the
+   * traveller down without touching the movement code.
+   */
+  speedScale = 1;
+
   /** Horizontal speed in world units per second. */
   get speed(): number {
     return Math.hypot(this.velocity.x, this.velocity.z);
@@ -71,7 +77,8 @@ export class Player {
     colliders: SpatialHash,
   ): void {
     const inputLength = Math.hypot(moveInput.x, moveInput.z);
-    const maxSpeed = PLAYER.walkSpeed * (sprint ? PLAYER.sprintMultiplier : 1);
+    const maxSpeed =
+      PLAYER.walkSpeed * this.speedScale * (sprint ? PLAYER.sprintMultiplier : 1);
 
     let targetX = 0;
     let targetZ = 0;
@@ -196,6 +203,16 @@ export class Player {
   /** How deep the player stands in water (0 on dry land). */
   get waterDepth(): number {
     return waterDepthAt(this.position.x, this.position.z);
+  }
+
+  /**
+   * True while the traveller's head is under water.
+   *
+   * Swimming on the surface is cheap; being under the water is what really
+   * costs you, and it is what the diving clothes are for.
+   */
+  get isUnderwater(): boolean {
+    return this.waterDepth > PLAYER.height * 0.85;
   }
 
   /** Teleports the player (used when loading a save). */

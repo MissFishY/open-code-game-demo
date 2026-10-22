@@ -48,7 +48,7 @@ export const RECIPES: readonly Recipe[] = [
       { item: 'fiber', qty: 1 },
     ],
     output: { item: 'axe', qty: 1 },
-    hint: '每棵树能砍下 2 木材。升级后更多。',
+    hint: '每棵树能砍下 3 木材，体力消耗也低得多。升级后更多。',
   },
   {
     id: 'pickaxe',
@@ -59,7 +59,7 @@ export const RECIPES: readonly Recipe[] = [
       { item: 'plank', qty: 1 },
     ],
     output: { item: 'pickaxe', qty: 1 },
-    hint: '每次能多挖 1 块石头。升级后更多。',
+    hint: '每次能挖到 3 块石头，体力消耗也低得多。升级后更多。',
   },
   // --- Decorations -------------------------------------------------------
   {

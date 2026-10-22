@@ -45,8 +45,13 @@ export interface SaveData {
   trust: Record<string, number>;
   /** The clock and the weather. */
   time: { day: number; phase: string; weather: string };
-  /** How much stamina the player has left. */
-  stamina: { current: number; max: number };
+  /** How much stamina the player has left, and how many nights they
+   *  have been awake in a row. */
+  stamina: { current: number; max: number; debt: number };
+  /** How well fed the player is. */
+  satiety: { current: number; max: number };
+  /** The chest at home. */
+  storage: Record<string, number>;
   flags: Record<string, boolean>;
   playTime: number;
   seenIntro: boolean;
@@ -82,7 +87,9 @@ export function createDefaultSave(): SaveData {
     market: { coins: 0, tools: { axe: 0, pickaxe: 0, rod: 0 }, wear: { axe: 0, pickaxe: 0, rod: 0 }, bought: [] },
     trust: { tallis: 0, nell: 0, maren: 0 },
     time: { day: 1, phase: 'morning', weather: 'clear' },
-    stamina: { current: 100, max: 100 },
+    stamina: { current: 100, max: 100, debt: 0 },
+    satiety: { current: 100, max: 100 },
+    storage: {},
     flags: {},
     playTime: 0,
     seenIntro: false,
@@ -145,7 +152,9 @@ export function sanitizeSave(raw: unknown): SaveData | null {
     },
     trust: { tallis: 0, nell: 0, maren: 0 },
     time: { day: 1, phase: 'morning', weather: 'clear' },
-    stamina: { current: 100, max: 100 },
+    stamina: { current: 100, max: 100, debt: 0 },
+    satiety: { current: 100, max: 100 },
+    storage: {},
     flags: {},
     playTime: 0,
     seenIntro: false,
@@ -276,6 +285,26 @@ export function sanitizeSave(raw: unknown): SaveData | null {
     if (isFiniteNumber(stamina.max)) out.stamina.max = Math.max(1, Math.floor(stamina.max));
     if (isFiniteNumber(stamina.current)) {
       out.stamina.current = Math.max(0, Math.min(out.stamina.max, Math.floor(stamina.current)));
+    }
+    if (isFiniteNumber(stamina.debt)) {
+      out.stamina.debt = Math.max(0, Math.min(6, Math.floor(stamina.debt)));
+    }
+  }
+
+  const satiety = data.satiety as Record<string, unknown> | undefined;
+  if (satiety && typeof satiety === 'object') {
+    if (isFiniteNumber(satiety.max)) out.satiety.max = Math.max(1, Math.floor(satiety.max));
+    if (isFiniteNumber(satiety.current)) {
+      out.satiety.current = Math.max(0, Math.min(out.satiety.max, Math.floor(satiety.current)));
+    }
+  }
+
+  const storage = data.storage;
+  if (storage && typeof storage === 'object') {
+    for (const [id, value] of Object.entries(storage as Record<string, unknown>)) {
+      if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+        out.storage[id] = Math.floor(value);
+      }
     }
   }
 

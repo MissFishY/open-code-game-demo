@@ -6,6 +6,7 @@
  */
 
 import { getItem } from '../data/items';
+import { SATIETY_EFFECTS, type SatietyState } from '../systems/SatietySystem';
 import type { DialogueChoice, DialogueNode } from '../data/npcs';
 import type { InventoryEntry } from '../systems/InventorySystem';
 import type { Recipe } from '../data/recipes';
@@ -15,6 +16,20 @@ import type { ShopEntry } from '../data/shop';
 import type { ExpansionDef } from '../data/interior';
 
 export type ToastKind = 'info' | 'good' | 'bad' | 'quest';
+
+/** A tool the traveller carries on their belt. */
+export interface ToolCard {
+  id: string;
+  name: string;
+  icon: string;
+  level: number;
+  /** Uses left before it breaks. */
+  remaining: number;
+  /** Uses it started with. */
+  max: number;
+  /** Coins you get if you sell it. */
+  refund: number;
+}
 
 export type PanelId =
   | 'none'
@@ -27,7 +42,8 @@ export type PanelId =
   | 'fishing'
   | 'interior'
   | 'journal'
-  | 'saves';
+  | 'saves'
+  | 'storage';
 
 function requireElement<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);
@@ -49,6 +65,10 @@ export class GameUI {
   private readonly statTools = requireElement<HTMLSpanElement>('stat-tools');
   private readonly staminaFill = requireElement<HTMLElement>('stamina-fill');
   private readonly staminaLabel = requireElement<HTMLElement>('stamina-label');
+  private readonly foodFill = requireElement<HTMLElement>('food-fill');
+  private readonly foodLabel = requireElement<HTMLElement>('food-label');
+  private readonly hungerVignette = requireElement<HTMLElement>('hunger-vignette');
+  private readonly soundButton = requireElement<HTMLButtonElement>('btn-sound');
   private readonly prompt = requireElement<HTMLDivElement>('prompt');
   private readonly promptText = requireElement<HTMLSpanElement>('prompt-text');
   private readonly toasts = requireElement<HTMLDivElement>('toasts');
@@ -59,6 +79,7 @@ export class GameUI {
   private readonly dialogueChoices = requireElement<HTMLDivElement>('dialogue-choices');
   private readonly inventory = requireElement<HTMLElement>('inventory');
   private readonly inventoryList = requireElement<HTMLUListElement>('inventory-list');
+  private readonly inventoryTools = requireElement<HTMLUListElement>('inventory-tools');
   private readonly crafting = requireElement<HTMLElement>('crafting');
   private readonly craftingList = requireElement<HTMLUListElement>('crafting-list');
   private readonly building = requireElement<HTMLElement>('building');
@@ -70,8 +91,8 @@ export class GameUI {
   private readonly homeText = requireElement<HTMLElement>('home-text');
   private readonly homeDetail = requireElement<HTMLElement>('home-detail');
   private readonly decor = requireElement<HTMLElement>('decor');
-  private readonly decorPlaced = requireElement<HTMLUListElement>('decor-placed');
   private readonly decorOwned = requireElement<HTMLUListElement>('decor-owned');
+  private readonly decorSlots = requireElement<HTMLUListElement>('decor-slots');
   private readonly cozyFill = requireElement<HTMLElement>('cozy-fill');
   private readonly cozyValue = requireElement<HTMLElement>('cozy-value');
   private readonly cozyTitle = requireElement<HTMLElement>('cozy-title');
@@ -79,6 +100,8 @@ export class GameUI {
   private readonly shopTitle = requireElement<HTMLElement>('shop-title');
   private readonly shopList = requireElement<HTMLUListElement>('shop-list');
   private readonly shopSell = requireElement<HTMLUListElement>('shop-sell');
+  private readonly shopShells = requireElement<HTMLUListElement>('shop-shells');
+  private readonly shopSurplus = requireElement<HTMLUListElement>('shop-surplus');
   private readonly shopTools = requireElement<HTMLUListElement>('shop-tools');
   private readonly shopHint = requireElement<HTMLElement>('shop-hint');
   private readonly fishing = requireElement<HTMLElement>('fishing');
@@ -91,11 +114,17 @@ export class GameUI {
   private readonly interiorExpansions = requireElement<HTMLUListElement>('interior-expansions');
   private readonly journal = requireElement<HTMLElement>('journal');
   private readonly journalList = requireElement<HTMLUListElement>('journal-list');
+  private readonly journalHints = requireElement<HTMLUListElement>('journal-hints');
   private readonly journalTrust = requireElement<HTMLElement>('journal-trust');
   private readonly restButton = requireElement<HTMLButtonElement>('btn-rest');
   private readonly homeDecorButton = requireElement<HTMLButtonElement>('btn-home-decor');
   private readonly homeCraftButton = requireElement<HTMLButtonElement>('btn-home-craft');
   private readonly homeInventoryButton = requireElement<HTMLButtonElement>('btn-home-inv');
+  private readonly homeStorageButton = requireElement<HTMLButtonElement>('btn-home-storage');
+  private readonly storage = requireElement<HTMLElement>('storage');
+  private readonly storageBag = requireElement<HTMLUListElement>('storage-bag');
+  private readonly storageChest = requireElement<HTMLUListElement>('storage-chest');
+  private readonly storageHint = requireElement<HTMLElement>('storage-hint');
   private readonly titleScreen = requireElement<HTMLElement>('title-screen');
   private readonly loadingScreen = requireElement<HTMLElement>('loading-screen');
   private readonly loadingText = requireElement<HTMLElement>('loading-text');
@@ -125,8 +154,22 @@ export class GameUI {
   onPanelClosed: (() => void) | null = null;
   /** Called when the player sells a tool. */
   onSellTool: ((toolId: string) => void) | null = null;
+  /** Called when the player sells a shell. */
+  onSellShell: ((itemId: string) => void) | null = null;
   /** Called when a HUD button is pressed. */
   onOpenPanel: ((panel: string) => void) | null = null;
+  /** Called when the player eats something from the backpack. */
+  onEat: ((itemId: string) => void) | null = null;
+  /** Called when the sound button is pressed. */
+  onToggleSound: (() => void) | null = null;
+  /** Called when the chest at home is opened. */
+  onOpenStorage: (() => void) | null = null;
+  /** Called when an item is put into the chest. */
+  onStore: ((itemId: string) => void) | null = null;
+  /** Called when an item is taken out of the chest. */
+  onTake: ((itemId: string) => void) | null = null;
+  /** Called when the player sells something they made. */
+  onSellSurplus: ((itemId: string) => void) | null = null;
   /** Called when the player buys something from a shop. */
   onBuy: ((entryId: string) => void) | null = null;
   /** Called when the player sells a fish. */
@@ -150,6 +193,10 @@ export class GameUI {
     this.homeDecorButton.addEventListener('click', () => this.onDecorate?.());
     this.homeCraftButton.addEventListener('click', () => this.onCraftAtHome?.());
     this.homeInventoryButton.addEventListener('click', () => this.onOpenInventory?.());
+    this.homeStorageButton.addEventListener('click', () => this.onOpenStorage?.());
+
+    // The sound button mutes everything.
+    this.soundButton.addEventListener('click', () => this.onToggleSound?.());
 
     // The HUD buttons open the panels with the mouse.
     for (const button of document.querySelectorAll<HTMLButtonElement>('[data-panel]')) {
@@ -230,6 +277,12 @@ export class GameUI {
     weather: string;
     stamina: number;
     staminaMax: number;
+    satiety: number;
+    satietyMax: number;
+    /** Nights spent awake in a row — each one costs stamina ceiling. */
+    sleepDebt?: number;
+    /** How hungry the traveller is. */
+    hunger?: SatietyState;
   }): void {
     this.statTime.textContent = `第 ${options.day} 天 · ${options.phase}`;
     this.statWeather.textContent = options.weather;
@@ -237,6 +290,34 @@ export class GameUI {
     this.staminaFill.style.width = `${Math.max(0, Math.min(1, ratio)) * 100}%`;
     this.staminaFill.classList.toggle('is-low', ratio < 0.25);
     this.staminaLabel.textContent = `体力 ${Math.round(options.stamina)}/${options.staminaMax}`;
+
+    const hunger = options.hunger ?? 'full';
+    const effect = SATIETY_EFFECTS[hunger];
+    const foodRatio = options.satietyMax > 0 ? options.satiety / options.satietyMax : 0;
+    this.foodFill.style.width = `${Math.max(0, Math.min(1, foodRatio)) * 100}%`;
+    this.foodFill.classList.toggle('is-low', foodRatio < 0.25);
+
+    const debt = options.sleepDebt ?? 0;
+    const hungry = hunger !== 'full';
+    this.foodLabel.textContent = hungry
+      ? `${effect.label} ${Math.round(options.satiety)}/${options.satietyMax}`
+      : `饱食 ${Math.round(options.satiety)}/${options.satietyMax}`;
+    if (debt > 0) {
+      this.foodLabel.textContent += ` · 熬夜 ${debt} 夜`;
+    }
+    this.foodLabel.classList.toggle('is-low', hungry);
+
+    // The screen darkens at the edges when the traveller is hungry.
+    this.hungerVignette.classList.toggle('is-peckish', hunger === 'peckish');
+    this.hungerVignette.classList.toggle('is-hungry', hunger === 'hungry');
+    this.hungerVignette.classList.toggle('is-weak', hunger === 'weak');
+  }
+
+  /** Shows or hides the speaker icon. */
+  setSoundIcon(muted: boolean): void {
+    this.soundButton.textContent = muted ? '🔇' : '🔊';
+    this.soundButton.classList.toggle('is-muted', muted);
+    this.soundButton.setAttribute('aria-label', muted ? '打开声音' : '关闭声音');
   }
 
   setPrompt(text: string | null): void {
@@ -307,8 +388,12 @@ export class GameUI {
     return this.openPanel === 'inventory';
   }
 
-  openInventory(entries: readonly InventoryEntry[]): void {
+  openInventory(
+    entries: readonly InventoryEntry[],
+    tools: readonly ToolCard[] = [],
+  ): void {
     this.renderInventory(entries);
+    this.renderToolBelt(tools);
     this.openPanel = 'inventory';
     this.inventory.classList.remove('hidden');
   }
@@ -326,8 +411,51 @@ export class GameUI {
       this.interior,
       this.journal,
       this.saves,
+      this.storage,
     ]) {
       panel.classList.add('hidden');
+    }
+  }
+
+  /** The tools on your belt — they are not carried in the backpack. */
+  renderToolBelt(tools: readonly ToolCard[]): void {
+    this.inventoryTools.replaceChildren();
+    if (tools.length === 0) {
+      const empty = document.createElement('li');
+      empty.className = 'inventory__empty';
+      empty.textContent = '你还没有工具。工作台上能做石斧和石镐。';
+      this.inventoryTools.appendChild(empty);
+      return;
+    }
+
+    for (const tool of tools) {
+      const row = document.createElement('li');
+      row.className = 'recipe';
+
+      const icon = document.createElement('span');
+      icon.className = 'recipe__icon';
+      icon.textContent = tool.icon;
+
+      const body = document.createElement('span');
+      const name = document.createElement('span');
+      name.className = 'recipe__name';
+      name.textContent = tool.name;
+      const info = document.createElement('span');
+      info.className = 'recipe__inputs';
+      info.textContent = `还能用 ${tool.remaining}/${tool.max} 次 · 坏了能卖 ${tool.refund} 币`;
+      body.append(name, info);
+
+      const bar = document.createElement('span');
+      bar.className = 'tool-bar';
+      const fill = document.createElement('span');
+      fill.className = 'tool-bar__fill';
+      const ratio = tool.max > 0 ? tool.remaining / tool.max : 0;
+      fill.style.width = `${Math.max(0, Math.min(1, ratio)) * 100}%`;
+      if (ratio < 0.25) fill.classList.add('is-low');
+      bar.appendChild(fill);
+
+      row.append(icon, body, bar);
+      this.inventoryTools.appendChild(row);
     }
   }
 
@@ -364,6 +492,18 @@ export class GameUI {
       count.textContent = `×${entry.count}`;
 
       row.append(icon, name, count);
+
+      // Anything edible can be eaten straight from the backpack.
+      if (item.food) {
+        const eat = document.createElement('button');
+        eat.type = 'button';
+        eat.className = 'button inventory__eat';
+        eat.textContent = '吃';
+        eat.title = `吃一个${item.name}`;
+        eat.addEventListener('click', () => this.onEat?.(entry.id));
+        row.appendChild(eat);
+      }
+
       this.inventoryList.appendChild(row);
     }
   }
@@ -471,15 +611,94 @@ export class GameUI {
     this.home.classList.remove('hidden');
   }
 
+  // ---------------------------------------------------------------- storage
+
+  /** Shows the chest at home: what you carry and what you stowed. */
+  showStorage(options: {
+    bag: { id: string; name: string; icon: string; count: number }[];
+    chest: { id: string; name: string; icon: string; count: number }[];
+    usedSlots: number;
+    maxSlots: number;
+    onStore: (id: string) => void;
+    onTake: (id: string) => void;
+  }): void {
+    this.storageHint.textContent =
+      `箱子 ${options.usedSlots}/${options.maxSlots} 格。背包满了就把东西放这儿。`;
+
+    const render = (
+      list: { id: string; name: string; icon: string; count: number }[],
+      target: HTMLUListElement,
+      emptyText: string,
+      action: (id: string) => void,
+      actionLabel: string,
+    ): void => {
+      target.replaceChildren();
+      if (list.length === 0) {
+        const empty = document.createElement('li');
+        empty.className = 'inventory__empty';
+        empty.textContent = emptyText;
+        target.appendChild(empty);
+        return;
+      }
+      for (const item of list) {
+        const row = document.createElement('li');
+        row.className = 'recipe';
+
+        const icon = document.createElement('span');
+        icon.className = 'recipe__icon';
+        icon.textContent = item.icon;
+
+        const body = document.createElement('span');
+        const name = document.createElement('span');
+        name.className = 'recipe__name';
+        name.textContent = `${item.name} ×${item.count}`;
+        body.append(name);
+
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'button recipe__craft';
+        button.textContent = actionLabel;
+        button.addEventListener('click', () => action(item.id));
+
+        row.append(icon, body, button);
+        target.appendChild(row);
+      }
+    };
+
+    render(options.bag, this.storageBag, '背包是空的。', options.onStore, '存入');
+    render(options.chest, this.storageChest, '箱子是空的。', options.onTake, '取出');
+
+    this.openPanel = 'storage';
+    this.storage.classList.remove('hidden');
+  }
+
   // ------------------------------------------------------------ decorations
 
   showDecor(options: {
     coziness: number;
     maxCoziness: number;
     tierTitle: string;
-    placed: { slot: string; slotLabel: string; name: string; icon: string }[];
-    owned: { type: string; name: string; icon: string; count: number; description: string }[];
+    owned: {
+      type: string;
+      name: string;
+      icon: string;
+      count: number;
+      description: string;
+      /** The slot it would go into, when there is a free one. */
+      targetSlot?: string;
+    }[];
+    /** Every slot around the hut, and what fits in it. */
+    slots: {
+      id: string;
+      label: string;
+      icon: string;
+      /** What is standing there right now. */
+      occupied?: { name: string; icon: string };
+      /** The decorations the player owns that fit here. */
+      fits: { type: string; name: string; icon: string; count: number }[];
+    }[];
     onPlace: (type: string) => void;
+    onPlaceIn: (slot: string, type: string) => void;
     onRemove: (slot: string) => void;
   }): void {
     const percent =
@@ -490,39 +709,51 @@ export class GameUI {
     this.cozyValue.textContent = `温馨度 ${options.coziness} / ${options.maxCoziness}`;
     this.cozyTitle.textContent = options.tierTitle;
 
-    this.decorPlaced.replaceChildren();
-    if (options.placed.length === 0) {
-      const empty = document.createElement('li');
-      empty.className = 'inventory__empty';
-      empty.textContent = '还没有布置任何东西。';
-      this.decorPlaced.appendChild(empty);
-    } else {
-      for (const item of options.placed) {
-        const row = document.createElement('li');
-        row.className = 'recipe recipe--ready';
+    // --- The slots themselves ---------------------------------------------
+    this.decorSlots.replaceChildren();
+    for (const slot of options.slots) {
+      const row = document.createElement('li');
+      row.className = slot.occupied ? 'recipe recipe--ready' : 'recipe recipe--empty';
 
-        const icon = document.createElement('span');
-        icon.className = 'recipe__icon';
-        icon.textContent = item.icon;
+      const icon = document.createElement('span');
+      icon.className = 'recipe__icon';
+      icon.textContent = slot.icon;
 
-        const body = document.createElement('span');
-        const name = document.createElement('span');
-        name.className = 'recipe__name';
-        name.textContent = item.name;
-        const where = document.createElement('span');
-        where.className = 'recipe__inputs';
-        where.textContent = item.slotLabel;
-        body.append(name, where);
+      const body = document.createElement('span');
+      const name = document.createElement('span');
+      name.className = 'recipe__name';
+      name.textContent = slot.label;
+      const info = document.createElement('span');
+      info.className = 'recipe__inputs';
+      info.textContent = slot.occupied
+        ? `${slot.occupied.icon} ${slot.occupied.name}`
+        : slot.fits.length > 0
+          ? '空着'
+          : '空着（你没有能放这儿的东西）';
+      body.append(name, info);
 
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = 'button recipe__craft';
-        button.textContent = '收回';
-        button.addEventListener('click', () => options.onRemove(item.slot));
-
-        row.append(icon, body, button);
-        this.decorPlaced.appendChild(row);
+      const actions = document.createElement('span');
+      actions.className = 'decor-slot__actions';
+      if (slot.occupied) {
+        const take = document.createElement('button');
+        take.type = 'button';
+        take.className = 'button recipe__craft';
+        take.textContent = '收回';
+        take.addEventListener('click', () => options.onRemove(slot.id));
+        actions.appendChild(take);
+      } else {
+        for (const fit of slot.fits) {
+          const put = document.createElement('button');
+          put.type = 'button';
+          put.className = 'button recipe__craft';
+          put.textContent = `放${fit.name}`;
+          put.addEventListener('click', () => options.onPlaceIn(slot.id, fit.type));
+          actions.appendChild(put);
+        }
       }
+
+      row.append(icon, body, actions);
+      this.decorSlots.appendChild(row);
     }
 
     this.decorOwned.replaceChildren();
@@ -552,7 +783,8 @@ export class GameUI {
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'button recipe__craft';
-        button.textContent = '放置';
+        button.textContent = item.targetSlot ? `放在 ${item.targetSlot}` : '放置';
+        button.disabled = !item.targetSlot;
         button.addEventListener('click', () => options.onPlace(item.type));
 
         row.append(icon, body, button);
@@ -569,17 +801,37 @@ export class GameUI {
   showShop(options: {
     sellerName: string;
     coins: number;
-    entries: { entry: ShopEntry; affordable: boolean; owned: boolean }[];
-    fish: { id: string; name: string; icon: string; count: number; price: number; wanted: boolean }[];
+    entries: { entry: ShopEntry; affordable: boolean; owned: boolean; cost?: number }[];
+    fish: {
+      id: string;
+      name: string;
+      icon: string;
+      count: number;
+      price: number;
+      wanted: boolean;
+      /** How many more this villager will take today. */
+      left: number;
+    }[];
+    /** Shells the player has collected, and what this villager pays for them. */
+    shells?: { id: string; name: string; icon: string; count: number; price: number; needed?: boolean }[];
+    /** Things you made more of than you need. */
+    surplus?: { id: string; name: string; icon: string; count: number; price: number }[];
     /** The fish this villager is especially keen on. */
     wants?: string | null;
     /** Tools the player owns, with their remaining uses and refund value. */
     tools?: { id: string; name: string; icon: string; remaining: number; refund: number }[];
+    /** How well the player knows this villager, and what it buys them. */
+    trust?: { level: number; max: number; reward: string | null };
   }): void {
     this.shopTitle.textContent = `${options.sellerName} 的铺子 · ${options.coins} 币`;
-    this.shopHint.textContent = options.wants
-      ? `卖鱼换钱。★ 标记的是 ${options.sellerName} 特别想收的鱼，价钱翻倍。`
-      : '卖鱼换钱。';
+    const trust = options.trust;
+    const trustLine = trust
+      ? `（信任 ${trust.level}/${trust.max}${trust.reward ? ` · ${trust.reward}` : ''}）`
+      : '';
+    this.shopHint.textContent =
+      (options.wants
+        ? `卖鱼换钱。★ 标记的是 ${options.sellerName} 特别想收的鱼，价钱更高。`
+        : '卖鱼换钱。') + trustLine;
 
     this.shopList.replaceChildren();
     if (options.entries.length === 0) {
@@ -602,20 +854,33 @@ export class GameUI {
       name.textContent = entry.name;
       const desc = document.createElement('span');
       desc.className = 'recipe__desc';
-      desc.textContent = entry.description;
+      // A hint is a secret until it has been paid for.
+      const secret = entry.kind === 'hint' && !owned;
+      if (secret) desc.classList.add('recipe__desc--secret');
+      desc.textContent = secret ? '买下来才告诉你。' : entry.description;
+      const price = options.entries.find((item) => item.entry.id === entry.id)?.cost;
       const cost = document.createElement('span');
       cost.className = 'recipe__inputs';
       cost.textContent = owned
         ? '已拥有'
         : entry.gift
           ? '免费借给你'
-          : `${entry.cost} 币`;
+          : price !== undefined && price !== entry.cost
+            ? `${price} 币（原价 ${entry.cost}）`
+            : `${entry.cost} 币`;
       body.append(name, desc, cost);
 
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'button recipe__craft';
-      button.textContent = owned ? '已买' : entry.gift ? '拿走' : '购买';
+      const shown = price ?? entry.cost;
+      button.textContent = owned
+        ? '已买'
+        : entry.gift
+          ? '拿走'
+          : shown === 0
+            ? '免费'
+            : '购买';
       button.disabled = owned || !affordable;
       button.addEventListener('click', () => this.onBuy?.(entry.id));
 
@@ -644,19 +909,59 @@ export class GameUI {
       name.textContent = `${fish.wanted ? '★ ' : ''}${fish.name} ×${fish.count}`;
       const price = document.createElement('span');
       price.className = 'recipe__inputs';
-      price.textContent = fish.wanted
-        ? `特别想要这个：${fish.price} 币/条`
-        : `卖 ${fish.price} 币/条`;
+      price.textContent =
+        fish.left <= 0
+          ? '今天收够了，明天再来'
+          : fish.wanted
+            ? `特别想要这个：${fish.price} 币/条 · 今天还能卖 ${fish.left} 条`
+            : `卖 ${fish.price} 币/条 · 今天还能卖 ${fish.left} 条`;
       body.append(name, price);
 
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'button recipe__craft';
       button.textContent = '卖掉';
+      button.disabled = fish.left <= 0;
       button.addEventListener('click', () => this.onSell?.(fish.id));
 
       row.append(icon, body, button);
       this.shopSell.appendChild(row);
+    }
+
+    // --- Things you made too many of ------------------------------------
+    this.shopSurplus.replaceChildren();
+    const surplus = options.surplus ?? [];
+    if (surplus.length === 0) {
+      const empty = document.createElement('li');
+      empty.className = 'inventory__empty';
+      empty.textContent = '你身上没有多余的东西。';
+      this.shopSurplus.appendChild(empty);
+    }
+    for (const item of surplus) {
+      const row = document.createElement('li');
+      row.className = 'recipe';
+
+      const icon = document.createElement('span');
+      icon.className = 'recipe__icon';
+      icon.textContent = item.icon;
+
+      const body = document.createElement('span');
+      const name = document.createElement('span');
+      name.className = 'recipe__name';
+      name.textContent = `${item.name} ×${item.count}`;
+      const info = document.createElement('span');
+      info.className = 'recipe__inputs';
+      info.textContent = `卖 ${item.price} 币`;
+      body.append(name, info);
+
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'button recipe__craft';
+      button.textContent = '卖掉';
+      button.addEventListener('click', () => this.onSellSurplus?.(item.id));
+
+      row.append(icon, body, button);
+      this.shopSurplus.appendChild(row);
     }
 
     // --- Tools you can sell ---------------------------------------------
@@ -693,6 +998,45 @@ export class GameUI {
 
       row.append(icon, body, button);
       this.shopTools.appendChild(row);
+    }
+
+    // --- Shells you can sell ---------------------------------------------
+    this.shopShells.replaceChildren();
+    const shells = options.shells ?? [];
+    if (shells.length === 0) {
+      const empty = document.createElement('li');
+      empty.className = 'inventory__empty';
+      empty.textContent = '你没有贝壳。潮线上应该有不少。';
+      this.shopShells.appendChild(empty);
+    }
+    for (const shell of shells) {
+      const row = document.createElement('li');
+      row.className = 'recipe';
+
+      const icon = document.createElement('span');
+      icon.className = 'recipe__icon';
+      icon.textContent = shell.icon;
+
+      const body = document.createElement('span');
+      const name = document.createElement('span');
+      name.className = 'recipe__name';
+      name.textContent = shell.name;
+      const info = document.createElement('span');
+      info.className = 'recipe__inputs';
+      info.textContent = shell.needed
+        ? `×${shell.count} · 最后一个要留着`
+        : `×${shell.count} · 卖 ${shell.price} 币`;
+      body.append(name, info);
+
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'button recipe__craft';
+      button.textContent = '卖掉';
+      button.disabled = shell.needed === true;
+      button.addEventListener('click', () => this.onSellShell?.(shell.id));
+
+      row.append(icon, body, button);
+      this.shopShells.appendChild(row);
     }
 
     this.openPanel = 'shop';
@@ -900,6 +1244,8 @@ export class GameUI {
   showJournal(options: {
     quests: { title: string; summary: string; status: string; chapter: string }[];
     trust: { name: string; level: string }[];
+    /** Hints the player has paid for — kept here so they can be re-read. */
+    hints?: { title: string; text: string }[];
   }): void {
     this.journalList.replaceChildren();
     for (const quest of options.quests) {
@@ -924,6 +1270,36 @@ export class GameUI {
 
       row.append(icon, body);
       this.journalList.appendChild(row);
+    }
+
+    // Hints the player bought from Maren.
+    this.journalHints.replaceChildren();
+    const hints = options.hints ?? [];
+    if (hints.length === 0) {
+      const empty = document.createElement('li');
+      empty.className = 'inventory__empty';
+      empty.textContent = '还没有买过任何线索。';
+      this.journalHints.appendChild(empty);
+    }
+    for (const hint of hints) {
+      const row = document.createElement('li');
+      row.className = 'recipe';
+
+      const icon = document.createElement('span');
+      icon.className = 'recipe__icon';
+      icon.textContent = '🔮';
+
+      const body = document.createElement('span');
+      const name = document.createElement('span');
+      name.className = 'recipe__name';
+      name.textContent = hint.title;
+      const desc = document.createElement('span');
+      desc.className = 'recipe__desc';
+      desc.textContent = hint.text;
+      body.append(name, desc);
+
+      row.append(icon, body);
+      this.journalHints.appendChild(row);
     }
 
     this.journalTrust.textContent = options.trust

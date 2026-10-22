@@ -35,13 +35,22 @@
             <button type="button" class="hud-button" data-panel="saves">存档<kbd>K</kbd></button>
             <button type="button" class="hud-button" data-panel="inventory">背包<kbd>Tab</kbd></button>
             <button type="button" class="hud-button" data-panel="journal">日志<kbd>J</kbd></button>
+            <button type="button" class="hud-button hud-button--icon" id="btn-sound" aria-label="声音">🔊</button>
           </div>
         </div>
 
         <section id="stamina-panel" class="stamina">
-          <div class="stamina__bar"><div id="stamina-fill" class="stamina__fill"></div></div>
-          <span id="stamina-label" class="stamina__label">体力 100/100</span>
+          <div class="stamina__row">
+            <div class="stamina__bar"><div id="stamina-fill" class="stamina__fill"></div></div>
+            <span id="stamina-label" class="stamina__label">体力 60/60</span>
+          </div>
+          <div class="stamina__row">
+            <div class="stamina__bar stamina__bar--food"><div id="food-fill" class="stamina__fill stamina__fill--food"></div></div>
+            <span id="food-label" class="stamina__label">饱食 100/100</span>
+          </div>
         </section>
+
+        <div id="hunger-vignette" class="hunger-vignette" aria-hidden="true"></div>
 
         <div id="resume-hint" class="resume-hint hidden">点击画面继续游戏（鼠标视角）</div>
 
@@ -66,7 +75,7 @@
             <li><b>J</b> 日志</li>
             <li><b>Esc</b> 关闭面板 / 释放鼠标</li>
           </ul>
-          <p class="panel--help__note">右上角也有「存档 / 背包 / 日志」三个按钮，鼠标自由时可以直接点。</p>
+          <p class="panel--help__note">右上角也有「存档 / 背包 / 日志」三个按钮，鼠标自由时可以直接点。<br />饿了？在背包里点「吃」。</p>
         </section>
 
         <!-- 对话 ---------------------------------------------------------->
@@ -84,6 +93,8 @@
           <button class="panel-close" type="button" data-close="inventory" aria-label="关闭">✕</button>
           <h2 class="inventory__title">背包</h2>
           <ul id="inventory-list" class="inventory__list"></ul>
+          <h3 class="panel-box__section">工具</h3>
+          <ul id="inventory-tools" class="recipe-list"></ul>
           <p class="inventory__hint">按 <b>Tab</b> 关闭</p>
         </section>
 
@@ -121,8 +132,8 @@
               <span id="cozy-title">属于你自己的地方</span>
             </div>
           </div>
-          <h3 class="panel-box__section">已放置</h3>
-          <ul id="decor-placed" class="recipe-list"></ul>
+          <h3 class="panel-box__section">摆放位置</h3>
+          <ul id="decor-slots" class="recipe-list"></ul>
           <h3 class="panel-box__section">可放置</h3>
           <ul id="decor-owned" class="recipe-list"></ul>
           <p class="panel-box__hint">按 <b>Tab</b> 或 <b>Esc</b> 关闭</p>
@@ -137,6 +148,7 @@
           <div class="panel-box__actions">
             <button id="btn-rest" class="button button--primary" type="button">休息并保存</button>
             <button id="btn-home-decor" class="button" type="button">布置</button>
+            <button id="btn-home-storage" class="button" type="button">储物</button>
             <button id="btn-home-craft" class="button" type="button">制作</button>
             <button id="btn-home-inv" class="button" type="button">打开背包</button>
           </div>
@@ -152,6 +164,10 @@
           <ul id="shop-list" class="recipe-list"></ul>
           <h3 class="panel-box__section">你带的鱼</h3>
           <ul id="shop-sell" class="recipe-list"></ul>
+          <h3 class="panel-box__section">你捡的贝壳</h3>
+          <ul id="shop-shells" class="recipe-list"></ul>
+          <h3 class="panel-box__section">你做多了的东西</h3>
+          <ul id="shop-surplus" class="recipe-list"></ul>
           <h3 class="panel-box__section">你的工具</h3>
           <ul id="shop-tools" class="recipe-list"></ul>
           <p class="panel-box__hint">按 <b>Tab</b> 或 <b>Esc</b> 关闭</p>
@@ -168,6 +184,18 @@
             <div id="fishing-marker" class="fish-bar__marker"></div>
           </div>
           <p class="panel-box__hint">按 <b>E</b> 收线 · <b>Esc</b> 停止</p>
+        </section>
+
+        <!-- 储物 ---------------------------------------------------------->
+        <section id="storage" class="panel-box hidden">
+          <button class="panel-close" type="button" data-close="storage" aria-label="关闭">✕</button>
+          <h2 class="panel-box__title">家里的箱子</h2>
+          <p id="storage-hint" class="panel-box__sub"></p>
+          <h3 class="panel-box__section">背包</h3>
+          <ul id="storage-bag" class="recipe-list"></ul>
+          <h3 class="panel-box__section">箱子</h3>
+          <ul id="storage-chest" class="recipe-list"></ul>
+          <p class="panel-box__hint">按 <b>Tab</b> 或 <b>Esc</b> 关闭</p>
         </section>
 
         <!-- 屋内 ---------------------------------------------------------->
@@ -194,6 +222,8 @@
           <button class="panel-close" type="button" data-close="journal" aria-label="关闭">✕</button>
           <h2 class="panel-box__title">日志</h2>
           <ul id="journal-list" class="recipe-list"></ul>
+          <h3 class="panel-box__section">买来的线索</h3>
+          <ul id="journal-hints" class="recipe-list"></ul>
           <p id="journal-trust" class="panel-box__desc"></p>
           <p class="panel-box__hint">按 <b>Tab</b> 或 <b>Esc</b> 关闭</p>
         </section>

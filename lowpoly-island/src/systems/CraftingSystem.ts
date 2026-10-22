@@ -25,7 +25,7 @@ export interface CraftResult {
   /** Items that were produced. */
   produced: ItemAmount[];
   /** Set when the craft failed because something was missing. */
-  reason?: 'missing-materials' | 'inventory-full' | 'unknown-recipe';
+  reason?: 'missing-materials' | 'inventory-full' | 'unknown-recipe' | 'already-owned';
 }
 
 export class CraftingSystem {
@@ -57,9 +57,17 @@ export class CraftingSystem {
   /**
    * Crafts a recipe, consuming the inputs and producing the output.
    * Nothing happens when the materials are missing.
+   *
+   * @param ownedTool true when the recipe makes a tool the traveller already
+   *   has. A second axe would quietly repair the first one, so it is refused.
    */
-  craft(recipe: Recipe, inventory: Inventory): CraftResult {
+  craft(recipe: Recipe, inventory: Inventory, ownedTool = false): CraftResult {
     const result: CraftResult = { ok: false, consumed: [], produced: [] };
+
+    if (ownedTool) {
+      result.reason = 'already-owned';
+      return result;
+    }
 
     if (!this.canCraft(recipe, inventory)) {
       result.reason = 'missing-materials';

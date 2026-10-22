@@ -35,6 +35,14 @@ export const DECORATION_SLOTS: readonly DecorationSlot[] = [
   { id: 'wall-b', kind: 'wall', label: '后墙', offset: { x: 1.3, y: 1.5, z: -1.78 }, accepts: ['shell'] },
 ];
 
+/** A little icon for each kind of slot, shown in the decoration panel. */
+export const SLOT_ICONS: Record<DecorationSlotKind, string> = {
+  firepit: '🔥',
+  around: '📍',
+  roof: '🏠',
+  wall: '🧱',
+};
+
 export interface DecorationDef {
   id: string;
   /** The inventory item this decoration is made from. */

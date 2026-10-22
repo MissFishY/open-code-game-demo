@@ -125,9 +125,10 @@ export const VOICES: Record<'tallis' | 'nell' | 'maren', NpcVoice> = {
       },
       {
         id: 'tallis.react.full',
-        text: '你的包快撑爆了。腾出地方，或者先走一趟。',
+        text: '你的包快撑爆了。回小屋把东西放进箱子里吧。',
         when: { full: true },
         weight: 8,
+        once: true,
       },
       {
         id: 'tallis.react.hut',
@@ -247,9 +248,10 @@ export const VOICES: Record<'tallis' | 'nell' | 'maren', NpcVoice> = {
       },
       {
         id: 'nell.react.full',
-        text: '这包要撑爆线了。给我看看。唉……你真该换个大的。',
+        text: '这包要撑爆线了。给我看看。唉……回小屋把东西放进箱子里去吧。',
         when: { full: true },
         weight: 8,
+        once: true,
       },
       {
         id: 'nell.react.hut',
@@ -369,9 +371,10 @@ export const VOICES: Record<'tallis' | 'nell' | 'maren', NpcVoice> = {
       },
       {
         id: 'maren.react.full',
-        text: '你装满了东西，却空了地方。分清哪个更要紧。',
+        text: '你装满了东西，却空了地方。回小屋把不急的放进箱子里吧。',
         when: { full: true },
         weight: 8,
+        once: true,
       },
       {
         id: 'maren.react.hut',

@@ -72,22 +72,97 @@ morning.
 | 雨 rain  | Fish bite far less often, the water is rough, stamina drains faster outdoors |
 | 风 wind  | The fish are nervous, the water is choppy              |
 
-**Stamina** drains while sprinting, swimming, chopping, mining and diving, and
-recovers while you rest. At zero you cannot sprint and swimming becomes
-dangerous. **Resting** in your hut (or by the fire) refills it, rolls the
-night over, resets the villagers' greetings and saves the game.
+### The day
+
+| 时段 | 时长 | 说明 |
+| ---- | ---- | ---- |
+| 清晨 | 2 分钟 | 天气重掷，村民重新打招呼 |
+| 白天 | 2 分钟 | 干活的好时候 |
+| 傍晚 | 2 分钟 | 天开始暗下来 |
+| 夜晚 | 4 分钟 | 最长的一段 —— 月鱼只在晴朗的夜里出现 |
+| **一天** | **10 分钟** | |
+
+夜晚特意留得最长：月鱼只在无风的夜里浮上来，一个晴夜大约能钓到 4 条。
+
+### Stamina 体力
+
+体力上限只有 **60**，而且是会被花掉的资源。站着不动回得比走路快，但回得很慢 ——
+砍两棵树就得歇。
 
 | 动作 | 消耗 | 恢复 |
 | ---- | ---- | ---- |
-| 冲刺 | 26 / 秒 | 站立 15 / 秒，走路 5 / 秒 |
-| 游泳 | 14 / 秒（雨天 ×1.6） | 同上 |
-| 潜水 | 20 / 秒 | 同上 |
-| 砍树 | 9 / 次 | 同上 |
-| 挖矿 | 8 / 次 | 同上 |
-| 抛竿 | 5 / 次 | 同上 |
+| 冲刺 | 18 / 秒 | 站立 4 / 秒，走路 1.5 / 秒 |
+| 游泳 | 14 / 秒（雨天 ×1.6） | 同上（在水里不回） |
+| 潜水 | **26 / 秒** | 同上 |
+| 砍树（徒手） | **25 / 次** | 同上 |
+| 挖矿（徒手） | **22 / 次** | 同上 |
+| 摘芦苇 / 采浆果 | 4 / 次 | 同上 |
+| 抛竿 | 7 / 次 | 同上（坐在岸边也算休息） |
 
-So you can sprint for roughly three seconds before you need to catch your
-breath, and a swim across the lake is a real decision rather than a free ride.
+满体力大约能冲刺 3 秒半。
+
+**水里的价格可以靠衣服压下来。** 游泳 14 / 秒、潜水 26 / 秒，衣服的
+百分比会叠加上去 —— 雨天除非穿工作外套，否则 ×1.6。
+
+| 潜水时长（满体力 60） | 减伤 | 能憋 |
+| ------------------ | --- | --- |
+| 什么都不穿 | 0% | 2.3 秒 |
+| 游泳衣 | 30% | 3.3 秒 |
+| ＋潜水服 | 55% | 5.1 秒 |
+| ＋潜水面罩 | 80% | **11.5 秒** |
+
+**手上拿着工具，每一次挥砍都便宜得多** —— 这就是工具存在的意义：
+
+| 工具等级 | 砍树消耗 | 每次产出 | 每 1 木材的体力 |
+| -------- | -------- | -------- | --------------- |
+| 徒手 | 25 | 1 木 | **25** |
+| 石斧 | 14 | 3 木 | 4.7 |
+| 磨石斧 | 11 | 6 木 | 1.8 |
+| 护林员之斧 | 8 | 10 木 | 0.8 |
+
+挖矿同理：徒手 22 点挖 1 块，石镐 12 点挖 3 块，矿工之镐 7 点挖 10 块。
+
+徒手砍完一条满的体力（约 2 棵树）就得歇 15 秒（站着回 4 / 秒）；
+换成石斧，一条满的体力能砍 4 棵树。**一整天的体力只够徒手砍 240 棵树，
+而岛上只有 56 棵** —— 所以斧子不是"锦上添花"，是必需品。
+
+### 饱食度
+
+屏幕底部有两条：上面是体力，下面是**饱食度**。饱食度会随时间自己掉，
+干活的时候掉得更快 —— 平均每砍一棵树要掉 2.7 点，一顿饱和饭大约撑 35 棵树。
+
+它是**分级的**，而且是双向的：吃得好回得快，饿得狠就什么都干不了。
+
+| 饱食度 | 状态 | 影响 |
+| ------ | ---- | ---- |
+| 60~100 | 精神饱满 | 体力恢复 **+25%** |
+| 30~60 | 有点饿 | 移动速度 -8%，画面边缘微微发暗 |
+| 10~30 | 很饿 | 体力恢复 -50%，不能冲刺，移动 -15% |
+| 0~10 | **虚弱** | 体力上限 **-50%**，不能冲刺、不能干活，移动 -30% |
+
+「不能干活」的意思是：砍树、挖矿、钓鱼都会被拒绝，但你**还能走路、
+还能摘浆果、还能吃任何东西**。所以饿过头不会卡死，只是很狼狈。
+
+**吃东西**能补回来 —— 背包里点「吃」就行：
+
+| 食物 | 饱食 | 体力 | 从哪来 |
+| ---- | ---- | ---- | ------ |
+| 浆果 🫐 | +20 | +8 | 野外草丛里捡 |
+| 干粮 🍞 | +30 | +18 | Nell，3 币 |
+| 热饭 🍲 | +50 | +30 | Nell，6 币 |
+
+一整天（10 分钟）不吃饭基本能把饱食度吃空，所以一天至少得吃一顿。
+
+### 熬夜
+
+夜里不回小屋睡觉，天亮之后**体力上限会少 5 点**。连续熬两夜就少 10 点。
+
+睡一觉**只回体力**、清掉熬夜计数，**肚子不会因此变饱** —— 睡觉是休息，
+不是吃饭。如果头天晚上把饱食度熬空了，醒来还是饿的，想下地干活就得
+先吃东西（浆果是免费的，干粮和热饭在 Nell 那里）。
+
+所以夜晚是个选择：熬到夜里钓鱼（晴夜能钓到月鱼，Maren 出双倍价），
+还是回小屋睡个安稳觉 —— 体力满血，但明早得吃过饭才有力气干活。
 
 ## The mouse
 
@@ -105,6 +180,20 @@ You never have to fight the cursor:
   click the world to get the camera back.
 - Three buttons in the corner (存档 / 背包 / 日志) open the panels directly,
   and they work as soon as the mouse is free.
+
+## Sound
+
+The game makes its own music and sound effects — there are no audio files, so
+the single-file build stays small and nothing loops audibly.
+
+- **Music** is a slow generative loop: a soft pad, a plucked melody and a
+  bass line over a four-bar progression. It follows the time of day — a
+  brighter key during the day, a slower minor one at night, and something
+  sparse and warm while you are inside your hut.
+- **Sound effects** are synthesised on the fly: the thud of an axe, the ping
+  of a pickaxe, a splash when a fish bites, the little click of every
+  button, a chime when a quest is finished.
+- The 🔊 button in the top right mutes everything.
 
 ## The villagers
 
@@ -152,23 +241,27 @@ second workbench once it is raised.
 Bare hands work — you can always chop a tree or dig a rock. But a tool is
 worth its materials:
 
-| 工具 | 得到方式 | 每棵树 / 每块石头 |
-| ---- | -------- | ----------------- |
-| 徒手 | —— | 1 木材 · 2 石块 |
-| **石斧** | **自己合成**：2 石块 + 1 绳索 | 2 木材 · 4 石块 |
-| **石镐** | **自己合成**：2 石块 + 1 木板 | 2 木材 · 4 石块 |
-| **磨石斧 / 护林员之斧** | Tallis 处 20 / 48 币 + 材料 | 6 / 10 木材 |
-| **重石镐 / 矿工之镐** | Tallis 处 20 / 48 币 + 材料 | 6 / 10 石块 |
-| **韧鱼竿 / 月见鱼竿** | Tallis 处 30 / 65 币 + 材料 | 绿区更宽 |
+| 工具 | 得到方式 | 每棵树 / 每块石头 | 每次挥砍消耗 |
+| ---- | -------- | ----------------- | ------------ |
+| 徒手 | —— | 1 木材 · 1 石块 | 25 / 22 |
+| **石斧** | **自己合成**：2 石块 + 1 芦苇 | 3 木材 | 14 |
+| **石镐** | **自己合成**：2 石块 + 1 木板 | 3 石块 | 12 |
+| **磨石斧 / 护林员之斧** | Tallis 处 20 / 48 币 + 材料 | 6 / 10 木材 | 11 / 8 |
+| **重石镐 / 矿工之镐** | Tallis 处 20 / 48 币 + 材料 | 6 / 10 石块 | 10 / 7 |
+| **韧鱼竿 / 月见鱼竿** | Tallis 处 30 / 65 币 + 材料 | 绿区更宽 | 6 / 5 |
 
 **工具有耐久，会磨损。** 一级斧头只能用 30 次，砍完就断，回到徒手。
 断之前可以卖给 Tallis 换回一点钱（一级 4 币，二级 14 币，三级 36 币），
 或者留着继续用。耐久会存在存档里。
 
+**工具挂在腰上，不占背包。** 背包下面有一栏「工具」，直接写着你还剩几次
+能用，快断的时候会变红。同一时间只能有一把斧头 —— 再打一把并不能修好旧的
+（那样就等于白嫖修理），断了才能重新打。
+
 **Tallis 只会借你一根鱼竿**（免费，钓鱼是岛上的经济，得一开始就够得着）。
 斧头和镐子得你自己打 —— 所以开局的目标很明确：
 
-> 挖 1 块石头（2 下）→ 割 3 根芦苇 → **合成石斧** → 砍树快一倍
+> 挖 1 块石头（2 下）→ 割 3 根芦苇 → **合成石斧** → 砍树快三倍，还省一半体力
 
 石斧到手后效率翻倍，接着做石镐，再找 Tallis 升级工具。
 
@@ -188,15 +281,24 @@ and the door stands open so you can walk in and out.
 ## Decorating your hut
 
 Press `E` at the hut and choose **布置** (decorate). The panel shows a coziness
-meter, everything you have placed and everything in your backpack that you
-could place. Placing an item takes it out of your backpack; taking it back
-returns it — you can rearrange as much as you like, for free.
+meter and a list of **every place you can decorate**, so it is always obvious
+where a thing goes:
+
+- Each free slot lists the decorations you own that fit there, each with its
+  own **放…** button — you pick the spot, not the game.
+- Slots that already hold something show it and offer **收回** (take it back).
+- Slots with nothing that fits say so, so nothing feels hidden.
+- The **可放置** list at the bottom shows what you are carrying and where each
+  piece would end up ("放在 火坑").
+
+Placing an item takes it out of your backpack; taking it back returns it —
+you can rearrange as much as you like, for free.
 
 ### The slots
 
 | Slot kind | Where | How many | Fits                      |
 | --------- | ----- | -------- | ------------------------- |
-| 火坑 firepit | in front of the door | 1 | campfire |
+| 火坑 firepit | in front of the door | 1 | **campfire** |
 | 门前 / 门右 / 屋后 / 屋角 | around the hut | 4 | lantern, flowerpot, stool, shell |
 | 屋脊 roof ridge | on the roof | 2 | banner |
 | 后墙 back wall | on the back wall | 2 | shell |
@@ -245,10 +347,20 @@ walk back out. Past that the sea floor drops away steeply.
 
 ### Diving
 
-**Deep shells** live on the lake floor and the sea bed — 36 of them, worth
+**Deep shells** live on the lake floor and the sea bed — 27 of them, worth
 more than the beach shells. You cannot reach them by wading: buy the
 **swimsuit** from Nell, swim out, and press `E` over them. Diving costs
 stamina, so do not stay under too long.
+
+**两样贝壳都能卖钱。** 潮线上有 70 个普通海贝，深水里有 27 个深海螺，
+村民都收（海贝 1~2 币，深海螺 3 币，看是谁买）。不过 Maren 还要一个深海螺
+去交差，最后一个卖不掉。
+
+### 差点淹死
+
+体力在水里耗光之后，你还能撑 **10 秒**。撑不住的话，Nell 会把你从水里捞
+起来 —— 你在村口的草地上醒过来，日期跳到第二天，体力饱食全部回满，
+但你要付她 **10 块钱**的救命钱（身上不够就先欠着）。
 
 ### How you earn money
 
@@ -258,16 +370,48 @@ lends you his tools for free, so you can start fishing on day one. Then:
 > **钓鱼 → 卖给村民 → 拿钱 → 买游泳衣 / 衣服 / 家具 / 扩建**
 
 Each villager buys fish at a different rate and is after one species in
-particular — the fish they want pays **double**, and the shop marks it with
-★:
+particular — the fish they want pays **half again as much**, and the shop
+marks it with ★:
 
 | Buyer | Rate | Wants |
 | ----- | ---- | ----- |
-| Tallis | 0.6× | perch (2× rate) |
-| Nell | 0.7× | carp (2× rate) |
-| Maren | 0.8× | moonfish (2× rate) |
+| Tallis | 0.6× | perch (1.5× rate) |
+| Nell | 0.7× | carp (1.5× rate) |
+| Maren | 0.8× | moonfish (1.5× rate) |
+
+**每个村民一天只收 12 条鱼。** 一网下去 40 多条，卖不完就得等明天 ——
+所以"卖给谁"是个决定：鲈鱼留给 Tallis，鲤鱼留给 Nell，月鱼留给 Maren。
+
+**做多了的东西也能卖。** 商店里「你做的东西」一栏，木材、石块、芦苇、
+木板、绳索、野花，以及火堆、灯笼、彩旗、花盆、木凳都能出手。
+价格正好等于它们的原料价（木板 = 2 个木材 = 2 币），所以**卖东西只能
+清库存，永远不能靠倒卖赚钱**。
 
 Coins buy the clothes, the food, the furniture and Maren's hints.
+
+### Trust pays back
+
+Talking to a villager every day raises your **trust** with them, and once you
+know them well enough they start doing things for you:
+
+| Villager | Trust | What you get |
+| -------- | ----- | ------------ |
+| Tallis | 2 | He repairs every tool you carry, for free |
+| Nell | 3 | 20% off her food |
+| Maren | 4 | 30% off her hints |
+
+## The chest at home
+
+Your backpack is meant to be small, so there has to be somewhere to put the
+things you have gathered but do not need right now. Press `E` at your hut and
+choose **储物** (storage).
+
+- The **箱子** holds 24 kinds of item, 20 of each — more than the backpack.
+- Everything in it is saved with the game and is never lost.
+- Put things in while you are at home; take them out again whenever you need
+  them.
+- The villagers will mention the chest when your backpack really cannot take
+  another of something — but only once a day, so it does not become a nag.
 
 ## The wardrobe
 
@@ -281,10 +425,16 @@ their collar.
 | **Swimsuit** 🩱 | Nell | Lets you swim past the shallows; −25% swimming, −30% diving |
 | **Fisherman's Hat** 🎩 | Nell | +20% bite chance, wider catch band |
 | **Seaweed Cloak** 🧥 | Nell | +20 max stamina, faster recovery |
-| **Waders** 🥾 | Tallis | Faster recovery, −15% swimming drain |
+| **Waders** 🥾 | Tallis | +2.5/s recovery, −15% swimming drain |
 | **Work Coat** 🧥 | Tallis | +15 max stamina, rain no longer drains you |
+| **Dive Suit** 🩵 | Nell | −25% diving, −15% swimming, +10 max stamina |
+| **Diving Mask** 🥽 | Nell | −25% diving (stacks with the dive suit) |
 | **Shell Necklace** 📿 | Maren | +2 coziness, +10% bite chance |
 | **Aether Charm** 🔮 | Maren | Faster recovery, −15% diving, +1 coziness |
+
+Every one of those numbers is real: the swimming and diving relief is
+applied to the actual drain, and the work coat really does take the rain
+penalty away.
 
 ## Dialogue
 

@@ -8,6 +8,13 @@ export interface ItemDef {
   description: string;
   /** Colour used for the 3D pickup / UI swatch. */
   color: number;
+  /** Present on everything you can eat. */
+  food?: {
+    /** How much it fills the stomach. */
+    satiety: number;
+    /** How much energy it gives back right away. */
+    stamina: number;
+  };
 }
 
 export const ITEMS: Record<string, ItemDef> = {
@@ -38,6 +45,7 @@ export const ITEMS: Record<string, ItemDef> = {
     icon: '🫐',
     description: '岛上野生的小浆果，甜得很。',
     color: 0x7b4fa8,
+    food: { satiety: 20, stamina: 8 },
   },
   flower: {
     id: 'flower',
@@ -101,6 +109,15 @@ export const ITEMS: Record<string, ItemDef> = {
     icon: '🍲',
     description: '在炉子上热好的鱼汤，能把人从里暖到外。',
     color: 0xe08a4a,
+    food: { satiety: 50, stamina: 30 },
+  },
+  ration: {
+    id: 'ration',
+    name: '干粮',
+    icon: '🍞',
+    description: '硬得能敲核桃，但顶饿。',
+    color: 0xc9a46a,
+    food: { satiety: 30, stamina: 18 },
   },
   campfire: {
     id: 'campfire',

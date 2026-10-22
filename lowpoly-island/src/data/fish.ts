@@ -34,7 +34,7 @@ export const FISH: readonly FishDef[] = [
     description: '小小的、银闪闪的，多得数不清。',
     habitat: 'sea',
     rarity: 'common',
-    value: 3,
+    value: 2,
     weight: 34,
   },
   {
@@ -44,7 +44,7 @@ export const FISH: readonly FishDef[] = [
     description: '有条纹，脾气还倔。湖里全是它。',
     habitat: 'lake',
     rarity: 'common',
-    value: 4,
+    value: 3,
     weight: 30,
   },
   {
@@ -54,7 +54,7 @@ export const FISH: readonly FishDef[] = [
     description: '银光一闪，就只剩水面上一圈涟漪。',
     habitat: 'sea',
     rarity: 'uncommon',
-    value: 9,
+    value: 5,
     weight: 14,
   },
   {
@@ -64,7 +64,7 @@ export const FISH: readonly FishDef[] = [
     description: '又肥又慢，但值得你等。',
     habitat: 'lake',
     rarity: 'uncommon',
-    value: 12,
+    value: 7,
     weight: 12,
   },
   {
@@ -74,7 +74,7 @@ export const FISH: readonly FishDef[] = [
     description: '只在无风的静夜浮上来，而且会发光。',
     habitat: 'lake',
     rarity: 'rare',
-    value: 30,
+    value: 14,
     weight: 3,
     phases: ['night'],
     weather: ['clear'],

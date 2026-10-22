@@ -7,12 +7,24 @@
  *
  * Weather is deterministic for a given day number, so reloading a save
  * always gives the same morning.
+ *
+ * The day is deliberately short — ten minutes — so that one session is one
+ * "chapter" of island life. The night is the longest phase because the
+ * moonfish only surfaces on a calm night.
  */
 
 export type DayPhase = 'morning' | 'day' | 'evening' | 'night';
 export type Weather = 'clear' | 'rain' | 'wind';
 
 export const PHASE_ORDER: readonly DayPhase[] = ['morning', 'day', 'evening', 'night'];
+
+/** How long each phase lasts in real seconds. */
+export const PHASE_SECONDS: Record<DayPhase, number> = {
+  morning: 120,
+  day: 120,
+  evening: 120,
+  night: 240,
+};
 
 export const PHASE_LABELS: Record<DayPhase, string> = {
   morning: '清晨',
@@ -47,9 +59,10 @@ export class TimeSystem {
   private elapsed = 0;
 
   /**
-   * @param phaseSeconds how long one phase lasts in real seconds
+   * @param overrideSeconds makes every phase this long — used by the tests
+   *   to move the clock quickly.
    */
-  constructor(private readonly phaseSeconds = 240) {}
+  constructor(private readonly overrideSeconds?: number) {}
 
   get day(): number {
     return this._day;
@@ -69,6 +82,23 @@ export class TimeSystem {
 
   get isDaytime(): boolean {
     return this._phase === 'morning' || this._phase === 'day';
+  }
+
+  /** How long the current phase lasts, in seconds. */
+  get phaseLength(): number {
+    return this.overrideSeconds ?? PHASE_SECONDS[this._phase];
+  }
+
+  /** How long a whole day lasts, in seconds. */
+  get dayLength(): number {
+    if (this.overrideSeconds !== undefined) return this.overrideSeconds * PHASE_ORDER.length;
+    return PHASE_ORDER.reduce((sum, phase) => sum + PHASE_SECONDS[phase], 0);
+  }
+
+  /** How far through the current phase the player is, 0..1. */
+  get phaseProgress(): number {
+    const length = this.phaseLength;
+    return length > 0 ? Math.min(1, this.elapsed / length) : 0;
   }
 
   /** 0 at midnight, 1 at noon — used to drive the sun position. */
@@ -91,8 +121,8 @@ export class TimeSystem {
    */
   update(dt: number): DayPhase | null {
     this.elapsed += dt;
-    if (this.elapsed < this.phaseSeconds) return null;
-    this.elapsed -= this.phaseSeconds;
+    if (this.elapsed < this.phaseLength) return null;
+    this.elapsed -= this.phaseLength;
     return this.advancePhase();
   }
 
@@ -116,12 +146,7 @@ export class TimeSystem {
    * rolled for the new day.
    */
   rest(): void {
-    if (this._phase !== 'night') {
-      // Sleeping during the day still moves you to the next morning.
-      this._day += 1;
-    } else {
-      this._day += 1;
-    }
+    this._day += 1;
     this._phase = PHASE_ORDER[0] as DayPhase;
     this._weather = this.rollWeather();
     this.elapsed = 0;
