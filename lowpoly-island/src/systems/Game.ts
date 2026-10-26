@@ -77,6 +77,8 @@ import {
 } from '../data/npcs';
 import type { ResourceNode } from '../world/ResourceField';
 import { heightAt } from '../world/terrain';
+import { createPost, type PostProcess } from '../world/PostProcess';
+import { FOG } from '../world/palette';
 
 /** What it costs to be fished out of the lake by Nell. */
 const RESCUE_FEE = 10;
@@ -87,6 +89,8 @@ export class Game {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
   private readonly camera: THREE.PerspectiveCamera;
+  /** The grade-and-grain pass every frame goes through. */
+  private readonly post: PostProcess;
   private readonly input: InputSystem;
   private readonly cameraController: CameraController;
   private readonly inventory = new Inventory();
@@ -165,6 +169,10 @@ export class Game {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    // The soft look wants filmic highlights instead of clipped white.
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.05;
 
     this.camera = new THREE.PerspectiveCamera(
       CAMERA.fov,
@@ -173,6 +181,13 @@ export class Game {
       CAMERA.far,
     );
     this.camera.position.set(0, 8, 12);
+
+    this.post = createPost(
+      this.renderer,
+      window.innerWidth,
+      window.innerHeight,
+      this.renderer.getPixelRatio(),
+    );
 
     this.input = new InputSystem(canvas);
     this.cameraController = new CameraController(this.camera);
@@ -345,6 +360,7 @@ export class Game {
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height);
+    this.post.resize(width, height, this.renderer.getPixelRatio());
   }
 
   // -------------------------------------------------------------- main loop
@@ -356,7 +372,7 @@ export class Game {
     this.elapsed += dt;
 
     this.update(dt);
-    this.renderer.render(this.scene, this.camera);
+    this.post.render(this.scene, this.camera);
     this.rafId = requestAnimationFrame(this.frame);
   };
 
@@ -1575,20 +1591,20 @@ export class Game {
 
     const sun = this.world.sun;
     if (night) {
-      sun.intensity = 0.16;
-      sun.color.setHex(0x9fb6ff);
-      this.scene.fog = new THREE.Fog(0x1b2740, 60, 200);
+      sun.intensity = 0.2;
+      sun.color.setHex(0xa8bce0);
+      this.scene.fog = new THREE.Fog(0x39415a, 70, 220);
     } else if (evening) {
-      sun.intensity = 0.55;
-      sun.color.setHex(0xffb27a);
-      this.scene.fog = new THREE.Fog(0xd8a07a, 100, 300);
+      sun.intensity = 0.62;
+      sun.color.setHex(0xffc496);
+      this.scene.fog = new THREE.Fog(0xe3c3a6, 100, 280);
     } else {
-      sun.intensity = rain ? 0.55 : sun.intensity;
-      sun.color.setHex(rain ? 0xcfd8e8 : 0xfff2d0);
+      sun.intensity = rain ? 0.5 : sun.intensity;
+      sun.color.setHex(rain ? 0xd6dde6 : 0xfff3e0);
       this.scene.fog = new THREE.Fog(
-        rain ? 0x8fa3b5 : 0xa9d8ef,
-        rain ? 60 : 100,
-        rain ? 220 : 300,
+        rain ? 0xa9b4bf : FOG.color,
+        rain ? 60 : FOG.near,
+        rain ? 200 : FOG.far,
       );
     }
   }

@@ -16,6 +16,7 @@
 import { WORLD } from '../config';
 import { signedFbm2D, fbm2D } from '../utils/noise';
 import { clamp, clamp01, lerp, smoothstep } from '../utils/math';
+import { PALETTE } from './palette';
 
 export interface Hill {
   x: number;
@@ -149,14 +150,31 @@ export interface Rgb {
   b: number;
 }
 
+/**
+ * sRGB hex to linear numbers.
+ *
+ * The terrain writes its colours straight into a vertex-colour attribute,
+ * which Three.js reads as linear. Doing the conversion here (instead of
+ * pulling in Three.js) keeps this module testable in plain Node.
+ */
+function toLinear(hex: number): Rgb {
+  const channel = (value: number): number =>
+    value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  return {
+    r: channel(((hex >> 16) & 0xff) / 255),
+    g: channel(((hex >> 8) & 0xff) / 255),
+    b: channel((hex & 0xff) / 255),
+  };
+}
+
 const COLORS = {
-  wetSand: { r: 0.71, g: 0.63, b: 0.45 },
-  sand: { r: 0.88, g: 0.8, b: 0.56 },
-  grassLow: { r: 0.44, g: 0.6, b: 0.27 },
-  grassHigh: { r: 0.52, g: 0.66, b: 0.33 },
-  forest: { r: 0.29, g: 0.47, b: 0.24 },
-  rock: { r: 0.5, g: 0.5, b: 0.5 },
-  rockDark: { r: 0.38, g: 0.39, b: 0.4 },
+  wetSand: toLinear(PALETTE.wetSand),
+  sand: toLinear(PALETTE.sand),
+  grassLow: toLinear(PALETTE.grassLow),
+  grassHigh: toLinear(PALETTE.grassHigh),
+  forest: toLinear(PALETTE.forest),
+  rock: toLinear(PALETTE.rock),
+  rockDark: toLinear(PALETTE.rockDark),
 } satisfies Record<string, Rgb>;
 
 function mixRgb(a: Rgb, b: Rgb, t: number): Rgb {

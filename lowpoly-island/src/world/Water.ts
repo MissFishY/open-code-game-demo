@@ -9,6 +9,7 @@
 
 import * as THREE from 'three';
 import { WORLD } from '../config';
+import { FOG, WATER } from './palette';
 import { heightAt } from './terrain';
 
 const DEPTH_RANGE = 12; // metres of depth encoded into the texture
@@ -63,15 +64,17 @@ const fragmentShader = /* glsl */ `
     // Shore foam: a soft band that breathes with the waves.
     float band = 1.0 - smoothstep(0.0, 0.42, vDepth);
     float ripple = 0.65 + 0.35 * sin(vWorldPosition.x * 2.6 + vWorldPosition.z * 2.1 + uTime * 1.8);
-    color = mix(color, uFoamColor, clamp(band * ripple, 0.0, 1.0) * 0.7);
+    color = mix(color, uFoamColor, clamp(band * ripple, 0.0, 1.0) * 0.55);
 
     // Fade into the horizon so the ocean does not end in a hard line.
     float viewDistance = length(cameraPosition - vWorldPosition);
     float fogFactor = smoothstep(uFogNear, uFogFar, viewDistance);
     color = mix(color, uFogColor, fogFactor);
 
-    float alpha = mix(0.78, 0.94, d);
+    float alpha = mix(0.72, 0.9, d);
     gl_FragColor = vec4(color, alpha);
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
   }
 `;
 
@@ -115,12 +118,12 @@ export function buildWater(): WaterResult {
       uDepthMap: { value: depthTexture },
       uMapMin: { value: new THREE.Vector2(-extent, -extent) },
       uMapSize: { value: new THREE.Vector2(extent * 2, extent * 2) },
-      uShallowColor: { value: new THREE.Color(0x4fc7c0) },
-      uDeepColor: { value: new THREE.Color(0x14507f) },
-      uFoamColor: { value: new THREE.Color(0xe8f7ff) },
-      uFogColor: { value: new THREE.Color(0xa9d8ef) },
-      uFogNear: { value: 80 },
-      uFogFar: { value: 300 },
+      uShallowColor: { value: new THREE.Color(WATER.shallow) },
+      uDeepColor: { value: new THREE.Color(WATER.deep) },
+      uFoamColor: { value: new THREE.Color(WATER.foam) },
+      uFogColor: { value: new THREE.Color(FOG.color) },
+      uFogNear: { value: FOG.near },
+      uFogFar: { value: FOG.far },
     },
     vertexShader,
     fragmentShader,

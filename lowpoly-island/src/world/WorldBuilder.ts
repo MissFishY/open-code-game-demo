@@ -4,6 +4,7 @@
 
 import * as THREE from 'three';
 import { WORLD, WORLD_LAYOUT } from '../config';
+import { AMBIENT, FOG, HEMI, SKY, SUN } from './palette';
 import { buildTerrainMesh } from './TerrainMesh';
 import { buildWater, type WaterResult } from './Water';
 import { ResourceField, planPlacements } from './ResourceField';
@@ -35,6 +36,8 @@ const SKY_FRAGMENT = /* glsl */ `
     vec3 color = mix(uHorizonColor, uTopColor, smoothstep(0.0, 0.55, h));
     color = mix(uBottomColor, color, smoothstep(-0.25, 0.02, h));
     gl_FragColor = vec4(color, 1.0);
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
   }
 `;
 
@@ -96,9 +99,9 @@ export class World {
     const skyGeometry = new THREE.SphereGeometry(500, 24, 16);
     const skyMaterial = new THREE.ShaderMaterial({
       uniforms: {
-        uTopColor: { value: new THREE.Color(0x3f7fd0) },
-        uHorizonColor: { value: new THREE.Color(0xa9d8ef) },
-        uBottomColor: { value: new THREE.Color(0xd8e8c8) },
+        uTopColor: { value: new THREE.Color(SKY.top) },
+        uHorizonColor: { value: new THREE.Color(SKY.horizon) },
+        uBottomColor: { value: new THREE.Color(SKY.bottom) },
       },
       vertexShader: SKY_VERTEX,
       fragmentShader: SKY_FRAGMENT,
@@ -109,16 +112,16 @@ export class World {
     this.sky.name = 'sky';
     scene.add(this.sky);
 
-    scene.fog = new THREE.Fog(0xa9d8ef, 100, 300);
+    scene.fog = new THREE.Fog(FOG.color, FOG.near, FOG.far);
 
     // --- Lighting ---------------------------------------------------------
-    const hemi = new THREE.HemisphereLight(0xbfe4ff, 0x5a6b43, 0.6);
+    const hemi = new THREE.HemisphereLight(HEMI.sky, HEMI.ground, HEMI.intensity);
     scene.add(hemi);
 
-    const ambient = new THREE.AmbientLight(0xffffff, 0.22);
+    const ambient = new THREE.AmbientLight(0xffffff, AMBIENT);
     scene.add(ambient);
 
-    this.sun = new THREE.DirectionalLight(0xfff2d0, 1.05);
+    this.sun = new THREE.DirectionalLight(SUN.color, SUN.intensity);
     this.sun.position.set(48, 72, 32);
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);
@@ -126,6 +129,9 @@ export class World {
     this.sun.shadow.camera.far = 260;
     this.sun.shadow.bias = -0.0009;
     this.sun.shadow.normalBias = 0.035;
+    // Soft contact shadows: two light sources, not one — this keeps the dark
+    // sides of the props from going black.
+    this.sun.shadow.intensity = 0.72;
 
     const extent = this.shadowExtent;
     this.sun.shadow.camera.left = -extent;

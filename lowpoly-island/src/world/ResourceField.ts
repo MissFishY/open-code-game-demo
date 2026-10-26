@@ -23,6 +23,7 @@ import {
   createShellProp,
   type PropGeometry,
 } from './PropBuilder';
+import { FOLIAGE, MADE, PALETTE, SHELL } from './palette';
 import type { CircleCollider } from '../systems/CollisionSystem';
 
 export type ResourceKind =
@@ -432,6 +433,7 @@ export class ResourceField {
         return mesh;
       });
 
+      const tint = new THREE.Color();
       list.forEach((placement, index) => {
         const node: ResourceNode = {
           id: `node-${placement.kind}-${index}-${Math.round(placement.x * 10)}-${Math.round(placement.z * 10)}`,
@@ -461,6 +463,15 @@ export class ResourceField {
           this.writeMatrix(node, nodePart, 1, 1, 1);
         });
 
+        // A near-white tint multiplies the painted vertex colours, so two
+        // trees of the same kind no longer look stamped from one template.
+        if (resourceKind !== 'crystal') {
+          const noise = Math.sin(placement.x * 12.9898 + placement.z * 78.233) * 43758.5453;
+          const t = 0.94 + (noise - Math.floor(noise)) * 0.11;
+          tint.setRGB(t, t * 0.995, t * 0.975);
+          for (const mesh of meshes) mesh.setColorAt(index, tint);
+        }
+
         if (definition.colliderRadius > 0) {
           node.collider = {
             x: placement.x,
@@ -476,6 +487,7 @@ export class ResourceField {
 
       for (const mesh of meshes) {
         mesh.instanceMatrix.needsUpdate = true;
+        if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
         mesh.computeBoundingSphere();
       }
     }
@@ -485,22 +497,22 @@ export class ResourceField {
     switch (kind) {
       case 'wood':
         return variant === 0
-          ? createConifer(0x6d4c41, 0x2f7d3a)
-          : createBroadleaf(0x795548, 0x3f8f45);
+          ? createConifer(FOLIAGE.trunk, FOLIAGE.conifer)
+          : createBroadleaf(FOLIAGE.trunk, FOLIAGE.broadleaf);
       case 'stone':
-        return createRock(0x8d8d8d);
+        return createRock(PALETTE.rock);
       case 'berry':
-        return createBush(0x33691e);
+        return createBush(FOLIAGE.bush);
       case 'fiber':
-        return createReed(0xb9b45a);
+        return createReed(MADE.reed);
       case 'flower':
-        return createFlower();
+        return createFlower(FOLIAGE.flower);
       case 'crystal':
-        return createCrystal(0x53e0e6);
+        return createCrystal(MADE.crystal);
       case 'shell':
-        return createShellProp();
+        return createShellProp(SHELL.scallop, 'scallop');
       case 'deepshell':
-        return createShellProp(0x9ad7d0);
+        return createShellProp(SHELL.deep, 'conch');
     }
   }
 
@@ -509,13 +521,18 @@ export class ResourceField {
     if (kind === 'crystal') {
       return new THREE.MeshLambertMaterial({
         vertexColors,
-        emissive: new THREE.Color(0x1a6a72),
-        emissiveIntensity: 0.9,
+        flatShading: true,
+        emissive: new THREE.Color(0x2a6f6a),
+        emissiveIntensity: 0.55,
         transparent: true,
-        opacity: 0.92,
+        opacity: 0.94,
       });
     }
-    return new THREE.MeshLambertMaterial({ vertexColors });
+    if (kind === 'shell' || kind === 'deepshell') {
+      // The scallop is a single sheet, so it has to be drawn from both sides.
+      return new THREE.MeshLambertMaterial({ vertexColors, flatShading: true, side: THREE.DoubleSide });
+    }
+    return new THREE.MeshLambertMaterial({ vertexColors, flatShading: true });
   }
 
   private writeMatrix(
@@ -631,7 +648,7 @@ export class ResourceField {
   /** Scatter of decorative grass tufts (not resources). */
   static addGrass(group: THREE.Group, seed = WORLD.seed + 7): void {
     const rng = new Rng(seed);
-    const geometry = createGrassTuft(0x6aa844);
+    const geometry = createGrassTuft(FOLIAGE.grass);
     const material = new THREE.MeshLambertMaterial({
       vertexColors: true,
       side: THREE.DoubleSide,
@@ -653,6 +670,7 @@ export class ResourceField {
     const scale = new THREE.Vector3();
     const position = new THREE.Vector3();
     const euler = new THREE.Euler();
+    const tint = new THREE.Color();
 
     spots.forEach((spot, index) => {
       position.set(spot.x, heightAt(spot.x, spot.z), spot.z);
@@ -662,9 +680,15 @@ export class ResourceField {
       scale.set(s, s * rng.float(0.7, 1.3), s);
       matrix.compose(position, quaternion, scale);
       mesh.setMatrixAt(index, matrix);
+
+      // Near-white, so the blades keep the colour they were painted with.
+      const t = rng.float(0.9, 1.06);
+      tint.setRGB(t, t * rng.float(0.98, 1.02), t * rng.float(0.95, 1.0));
+      mesh.setColorAt(index, tint);
     });
 
     mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     mesh.computeBoundingSphere();
     group.add(mesh);
   }
